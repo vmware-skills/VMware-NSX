@@ -1,0 +1,24 @@
+{
+  "id": "vmware-nsx",
+  "name": "VMware NSX",
+  "description": "VMware NSX networking management with 33 MCP tools: segments, gateways, NAT, routing, IPAM.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "vmware-nsx": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "vmware-nsx-mgmt==1.9.0",
+        "vmware-nsx-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

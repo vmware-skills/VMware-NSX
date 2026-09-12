@@ -1,0 +1,20 @@
+{
+  "name": "@zw008/vmware-nsx",
+  "version": "1.9.0",
+  "description": "VMware NSX networking management with 33 MCP tools: segments, gateways, NAT, routing, IPAM.",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://github.com/vmware-skills/VMware-NSX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vmware-skills/VMware-NSX.git"
+  },
+  "openclaw": {
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2"
+    }
+  }
+}
