@@ -14,19 +14,19 @@ Complete setup and security guide for `vmware-nsx`.
 ### Via uv (recommended)
 
 ```bash
-uv tool install vmware-nsx-mgmt
+uv tool install vmware-nsx-mgmt==1.9.0
 ```
 
 ### Via pip
 
 ```bash
-pip install vmware-nsx-mgmt
+pip install vmware-nsx-mgmt==1.9.0
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/vmware-skills/VMware-NSX.git
+git clone --branch v1.9.0 https://github.com/vmware-skills/VMware-NSX.git
 cd VMware-NSX
 pip install -e .
 ```
@@ -49,25 +49,26 @@ Edit `~/.vmware-nsx/config.yaml`:
 
 ```yaml
 targets:
-  - name: nsx-prod              # Target identifier (used in CLI --target flag)
-    host: nsx-mgr.example.com   # NSX Manager hostname or IP (or VIP for cluster)
-    username: admin              # NSX Manager username
+  nsx-prod:                      # Target name (used in CLI --target flag)
+    host: nsx-mgr.example.com    # NSX Manager hostname or IP (or VIP for cluster)
+    username: svc-nsx            # NSX Manager service account (least privilege)
     port: 443
-    verify_ssl: false            # Set true if using valid certs
+    verify_ssl: true             # The default. Keep it on for any real environment
     environment: production      # Which environment this is — see below
 
-  - name: nsx-lab
+  nsx-lab:                       # Isolated lab only
     host: 10.0.0.100
     username: admin
     port: 443
-    verify_ssl: false
+    verify_ssl: false            # Lab NSX Manager with its factory self-signed cert
     environment: lab
 
-notify:
-  webhook_url: ""                # Optional: webhook for notifications
+default_target: nsx-prod
 ```
 
-The first target in the list is the default (used when `--target` is not specified).
+`targets` is a mapping keyed by target name. `default_target` is used when `--target` is not specified; without it, every command must name a target.
+
+**TLS verification**: `verify_ssl` defaults to `true` when omitted. If NSX Manager's certificate is issued by a private/enterprise CA, keep `verify_ssl: true` and point the `SSL_CERT_FILE` environment variable at a PEM bundle that contains that CA (or `SSL_CERT_DIR` at a hashed CA directory) — in your shell, or in the MCP server's `env` block. `SSL_CERT_FILE` replaces the default trust store for that process, so include any other CAs it needs. `verify_ssl: false` disables certificate and hostname checks entirely; use it only for an isolated lab NSX Manager, never for a production target.
 
 **`environment` (optional label)**: policy scopes its rules by this value, so an environment-scoped `deny` rule in `~/.vmware/rules.yaml` can match on it — for example, to freeze state-changing writes on `production`. Any label you like works (`production`, `staging`, `lab`, `dc2-prod`); the target's *name* is not used for it. A target with no label is simply not matched by such a rule. Read-only operations are never affected either way. Run `vmware-audit policy` to see the rules currently in force.
 
@@ -290,30 +291,28 @@ Read-only operations are also logged with `operation: "query"` for complete trac
 
 CLI write commands require two separate confirmation prompts before executing:
 
-1. First prompt: "Are you sure?" (default: No)
-2. Second prompt: "This modifies NSX network configuration. Confirm again?" (default: No)
+1. First prompt: "Confirm #1: <action> '<resource>'?" (default: No)
+2. Second prompt: "Confirm #2: This is irreversible. <action> '<resource>'?" (default: No)
 
-Both must be answered `y` for the operation to proceed. This applies to all create, update, and delete operations.
+Both must be answered `y` for the operation to proceed. This applies to all CLI create, update, and delete commands. MCP write tools have no confirmation step of their own: they execute when called (and are audit-logged), so the agent must call them only after the user has explicitly asked for that change. Use `~/.vmware/rules.yaml` deny rules to block writes on environments such as `production`.
 
 ### Dry-Run Mode
 
 All write commands support `--dry-run` to preview what would happen without making changes:
 
 ```bash
-vmware-nsx segment create app-web-seg --gateway app-t1 --subnet 10.10.1.1/24 --transport-zone tz-overlay --dry-run
-# Output: [DRY-RUN] Would create segment 'app-web-seg' (overlay) on gateway 'app-t1' with subnet 10.10.1.1/24
+vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24 --dry-run
 
-vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10 --dry-run
-# Output: [DRY-RUN] Would create SNAT rule on gateway 'app-t1': 10.10.1.0/24 → 172.16.0.10
+vmware-nsx nat create-rule --tier1 app-t1 --rule-id snat-1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10 --dry-run
 ```
+
+Dry-run prints the target, the API call it would make and its parameters (for updates and deletes, also the object's current state), then exits without changing anything.
 
 ### Dependency Checks
 
-Write operations include dependency validation to prevent cascade failures:
-
-- **Segment delete**: Checks for connected logical ports. If VMs or router interfaces are still connected, the operation is refused (unless `--force` is used)
-- **Tier-1 gateway delete**: Checks for connected segments. If segments are still attached, the operation is refused
-- **NAT/route operations**: Verifies that the target gateway exists before attempting the operation
+- **Segment delete**: Checks for attached ports. If any port is still attached (VMs or router interfaces), the operation is refused — there is no override; detach the ports first
+- **Tier-1 gateway delete**: Checks first, read-only: segments attached by `connectivity_path` and Tier-1-scoped segments, NAT rules, static routes, service interfaces on the `default` locale-service, locale-services other than `default`, IPsec / L2 VPN services, a DNS forwarder, and LB services attached to it. While any remain it refuses, deletes nothing and lists their ids; a read that fails with anything but 404 also refuses. `--dry-run` runs the same check. Only a clean gateway has its `default` locale-service and then itself deleted
+- **NAT/route operations**: Gateway existence is not pre-checked client-side; NSX Manager's API response decides
 
 ### Prompt Injection Defense
 
@@ -327,20 +326,18 @@ This prevents malicious object names from injecting prompts when the data flows 
 
 ### Input Validation
 
-- **CIDR networks**: Validated via Python's `ipaddress.ip_network()`
-- **IP addresses**: Validated via Python's `ipaddress.ip_address()`
-- **VLAN IDs**: Validated to be in range 0-4094
-- **Port numbers**: Validated to be in range 1-65535
-- **Segment/gateway/rule IDs**: Looked up via NSX API; returns a clear error if not found
-- **NAT actions**: Validated against allowed enum values
-- **IP pool ranges**: Start IP must be less than end IP, both must be within the specified CIDR
+- **Segment/gateway/rule/pool IDs**: Must match `^[A-Za-z0-9_-]+$` (no spaces, slashes, or dots), checked before any API call
+- **NAT actions**: Validated against the allowed set (SNAT, DNAT, REFLEXIVE, NO_SNAT, NO_DNAT, NAT64); SNAT/DNAT/REFLEXIVE also require a translated address
+- **IP pool subnets**: Each subnet must carry `cidr` and `allocation_ranges`
+- **Static route next hops**: At least one required, each as `{"ip_address": ...}`
+- **CIDR / IP / VLAN syntax and range checks**: Not done client-side — left to NSX Manager's own API validation
 
 ### Transport Security
 
 - The MCP server uses **stdio transport** (local only) — no network listener is opened
 - NSX Manager connections use HTTPS on port 443 by default
-- SSL certificate verification can be enabled per-target via `verify_ssl: true` in config.yaml
-- **Production recommendation**: Use `verify_ssl: true` with a valid CA certificate. Set `ca_cert_path` in config.yaml to specify a custom CA bundle
+- SSL certificate verification is on by default (`verify_ssl: true` when the key is omitted) and can be turned off per target
+- **Production**: keep `verify_ssl: true`. For a private-CA certificate, set the `SSL_CERT_FILE` (PEM bundle) or `SSL_CERT_DIR` environment variable — there is no per-target CA-path setting in config.yaml. Reserve `verify_ssl: false` for isolated labs
 
 ### What This Skill Cannot Do
 
@@ -359,32 +356,36 @@ You can configure multiple NSX Manager targets and switch between them:
 
 ```yaml
 targets:
-  - name: nsx-prod
+  nsx-prod:
     host: nsx-prod-vip.example.com
     username: svc-automation
     port: 443
-    verify_ssl: true
-    ca_cert_path: /etc/pki/tls/certs/nsx-prod-ca.pem
+    verify_ssl: true             # private CA: export SSL_CERT_FILE=/etc/pki/tls/certs/nsx-ca-bundle.pem
+    environment: production
 
-  - name: nsx-staging
+  nsx-staging:
     host: nsx-staging.example.com
-    username: admin
+    username: svc-automation
     port: 443
-    verify_ssl: false
+    verify_ssl: true
+    environment: staging
 
-  - name: nsx-lab
+  nsx-lab:                       # isolated lab only
     host: 10.0.1.100
     username: admin
     port: 443
-    verify_ssl: false
+    verify_ssl: false            # factory self-signed cert
+    environment: lab
+
+default_target: nsx-prod
 ```
 
 ```bash
-# Uses first target (nsx-prod) by default
-vmware-nsx segment list
+# Uses default_target (nsx-prod)
+vmware-nsx inventory list-segments
 
 # Explicitly target staging
-vmware-nsx segment list --target nsx-staging
+vmware-nsx inventory list-segments --target nsx-staging
 
 # Target lab
 vmware-nsx health alarms --target nsx-lab

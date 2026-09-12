@@ -146,7 +146,7 @@ targets:
 - `get_tier1_gateway` — 获取 Tier-1 详情：Tier-0 链路、路由通告
 - `create_tier1_gateway` — 创建 Tier-1 网关并关联 Edge 集群和 Tier-0
 - `update_tier1_gateway` — 更新 Tier-1 属性（路由通告、Tier-0 链路）
-- `delete_tier1_gateway` — 删除 Tier-1 网关（先移除 default locale-service）
+- `delete_tier1_gateway` — 删除 Tier-1 网关；先做只读预检，仍有 segment、NAT 规则、静态路由、服务接口、其他 locale-service、IPsec / L2 VPN 服务、DNS 转发器或负载均衡服务依赖它时拒绝删除、不做任何改动，并列出阻塞对象的 ID
 
 **NAT**（仅 Tier-1）
 - `list_nat_rules` — 列出 Tier-1 网关上的 NAT 规则
@@ -221,7 +221,7 @@ vmware-nsx gateway routes-t1 app-t1
 # NAT（写操作有双重确认 + --dry-run 预览）
 vmware-nsx nat list app-t1
 vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10
-vmware-nsx nat delete app-t1 rule-01
+vmware-nsx nat delete-rule --tier1 app-t1 --rule-id rule-01
 
 # 静态路由
 vmware-nsx route list app-t1
@@ -316,7 +316,7 @@ vmware-nsx-mcp
 | 只读为主 | 33 个工具中 20 个只读 |
 | 双重确认 | CLI 写操作需两次确认 |
 | --dry-run | 所有写操作支持预览模式 |
-| 依赖检查 | 删除操作验证无关联资源 |
+| 依赖检查 | 删除 segment 时若仍有端口连接则拒绝；删除 Tier-1 时若仍有 segment、NAT 规则、静态路由、接口或 VPN / DNS 转发器 / 负载均衡服务依赖它则拒绝，且不做任何改动（`--dry-run` 执行同样的检查）。其他删除操作不做预检 |
 | 输入验证 | CIDR、IP、VLAN ID、网关存在性验证 |
 | 审计日志 | 所有操作记录到 `~/.vmware-nsx/audit.log`（JSON Lines） |
 | 无防火墙操作 | 无法创建/修改 DFW 规则或安全组 |

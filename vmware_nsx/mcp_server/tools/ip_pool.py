@@ -31,9 +31,11 @@ def create_ip_pool(
 
     IP pools supply addresses to NSX consumers such as tunnel endpoints.
     Run list_ip_pools first to avoid overlapping ranges; start_ip and end_ip
-    must both fall inside cidr. The same pool_id overwrites (PUT). Returns the
-    created pool dict, else {"error", "hint"}. Then verify with
-    get_ip_pool_usage; delete_ip_pool is the inverse.
+    must both fall inside cidr. The same pool_id overwrites (PUT). Returns
+    {"created", "pool_id", "subnets_created", "subnets_failed"}. If the subnet
+    failed it also has "error": the pool itself WAS created and needs cleaning
+    up (the error says how). Other failures return {"error", "hint"}. Verify
+    with get_ip_pool_usage; delete_ip_pool is the inverse.
 
     Args:
         pool_id: Unique id (alphanumerics, hyphens, underscores only); becomes

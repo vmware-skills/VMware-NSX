@@ -141,9 +141,11 @@ def test_the_server_hands_the_loader_the_resolvers_own_default():
     edit to the real config would never be noticed."""
     import inspect
 
-    from vmware_nsx.mcp_server import server
+    # The call site moved out of mcp_server/server.py on 2026-09-11 so the CLI
+    # registers the same resolver; this is where it lives now.
+    from vmware_nsx import policy_environment
 
-    source = inspect.getsource(server)
+    source = inspect.getsource(policy_environment)
     assert "mtime_cached_loader(\"" + _ENV + "\", CONFIG_FILE, load_config)" in source, (
         "the call site no longer passes CONFIG_FILE as the default; if it now "
         "passes something else, this test must be updated deliberately rather "

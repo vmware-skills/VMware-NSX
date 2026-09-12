@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vmware_nsx.connection import NsxApiError
 from vmware_nsx.ops.nat_route_mgmt import (
     create_ip_pool,
     create_static_route,
@@ -35,7 +36,10 @@ def test_create_ip_pool_reports_partial_state_on_subnet_failure() -> None:
     client.put.side_effect = [
         {"id": "pool-1"},          # pool object
         {"id": "pool-1-subnet-0"},  # subnet 0 ok
-        RuntimeError("overlapping allocation range"),  # subnet 1 fails
+        # subnet 1 fails. An NsxApiError, because only the connection layer's
+        # authored text reaches the result — raw text of any other exception is
+        # reduced to its type (test_ip_pool_partial_failure.py).
+        NsxApiError("NSX Manager returned HTTP 400. overlapping allocation range", status_code=400),
     ]
 
     subnets = [
@@ -51,6 +55,9 @@ def test_create_ip_pool_reports_partial_state_on_subnet_failure() -> None:
     assert len(result["subnets_failed"]) == 1
     assert result["subnets_failed"][0]["subnet"] == "pool-1-subnet-1"
     assert "overlapping" in result["subnets_failed"][0]["error"]
+    # A failed subnet is a failed create: top-level error, pool still reported.
+    assert "WAS created, but 1 of 2 subnet(s) were not" in result["error"]
+    assert "1 working subnet(s)" in result["error"]
 
 
 def test_create_ip_pool_all_subnets_ok_reports_empty_failures() -> None:

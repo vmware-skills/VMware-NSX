@@ -21,7 +21,7 @@ from vmware_nsx.cli._base import (
 
 @route_app.command("create-static")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('create_static_route', risk_level='medium')
 def route_create_static(
     tier1_id: Annotated[str, typer.Option("--tier1", help="Tier-1 gateway ID")],
     route_id: Annotated[str, typer.Option("--route-id", help="Static route ID")],
@@ -55,7 +55,7 @@ def route_create_static(
 
 @route_app.command("delete-static")
 @_cli_errors
-@guarded(risk_level='high')
+@guarded('delete_static_route', risk_level='high')
 def route_delete_static(
     tier1_id: Annotated[str, typer.Option("--tier1", help="Tier-1 gateway ID")],
     route_id: Annotated[str, typer.Option("--route-id", help="Static route ID to delete")],

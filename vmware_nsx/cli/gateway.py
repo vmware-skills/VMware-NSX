@@ -21,7 +21,7 @@ from vmware_nsx.cli._base import (
 
 @gateway_app.command("create-tier1")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('create_tier1_gateway', risk_level='medium')
 def gateway_create_tier1(
     tier1_id: str,
     display_name: Annotated[str, typer.Option("--name", help="Display name")],
@@ -56,7 +56,7 @@ def gateway_create_tier1(
 
 @gateway_app.command("update-tier1")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('update_tier1_gateway', risk_level='medium')
 def gateway_update_tier1(
     tier1_id: str,
     display_name: Annotated[str | None, typer.Option("--name", help="New display name")] = None,
@@ -99,38 +99,66 @@ def gateway_update_tier1(
 
 @gateway_app.command("delete-tier1")
 @_cli_errors
-@guarded(risk_level='high')
+@guarded('delete_tier1_gateway', risk_level='high')
 def gateway_delete_tier1(
     tier1_id: str,
     target: TargetOption = None,
     config: ConfigOption = None,
     dry_run: DryRunOption = False,
 ) -> None:
-    """Delete a Tier-1 gateway (destructive!)."""
+    """Delete a Tier-1 gateway (destructive!).
+
+    Refuses, deleting nothing, while segments, NAT rules, static routes,
+    interfaces, VPN / DNS forwarder / load balancer services still depend on it.
+    """
+    from rich.markup import escape
+
     from vmware_nsx.ops.inventory import get_tier1_gateway
-    from vmware_nsx.ops.segment_mgmt import delete_tier1_gateway
+    from vmware_nsx.ops.segment_mgmt import (
+        delete_tier1_gateway,
+        tier1_delete_blockers,
+        tier1_refusal_message,
+    )
 
     client, _ = cli._get_connection(target, config)
     before = get_tier1_gateway(client, tier1_id)
     if dry_run:
+        # The same read-only pre-flight the real run makes, so the preview
+        # cannot promise a delete the real run would refuse.
+        blockers = tier1_delete_blockers(client, tier1_id)
+        base = f"/policy/api/v1/infra/tier-1s/{tier1_id}"
         _dry_run_print(
             target=cli._resolve_target(target),
             resource=tier1_id,
             operation="delete_tier1_gateway",
-            api_call=f"DELETE /policy/api/v1/infra/tier-1s/{tier1_id}",
+            api_call=(
+                "none — the pre-check would refuse" if blockers
+                else f"DELETE {base}/locale-services/default, then DELETE {base}"
+            ),
             before_state={"display_name": before.get("display_name"), "tier0_path": before.get("tier0_path")},
             resource_label="Tier-1 Gateway",
         )
+        if blockers:
+            # escape(): ids come from NSX, and Rich would swallow "[web-seg]" as markup.
+            console.print(f"[bold red]A real run would be REFUSED: {escape(tier1_refusal_message(tier1_id, blockers))}[/]")
         return
     cli._double_confirm("delete Tier-1 gateway", tier1_id, cli._resolve_target(target), resource_type="Tier-1 Gateway")
-    delete_tier1_gateway(client, tier1_id)
+    out = delete_tier1_gateway(client, tier1_id)
+    if out.get("deleted") is not True:
+        blockers = {k: v for k, v in out.items() if k.endswith("_ids")}
+        console.print(f"[bold red]Tier-1 gateway '{tier1_id}' was NOT deleted. {escape(str(out.get('error', '')))}[/]")
+        cli._audit.log(
+            target=cli._resolve_target(target), operation="delete_tier1_gateway", resource=tier1_id,
+            parameters={}, after_state={"deleted": False, **blockers}, result="error",
+        )
+        raise typer.Exit(1)
     console.print(f"[green]Tier-1 gateway '{tier1_id}' deleted.[/]")
     cli._audit.log(target=cli._resolve_target(target), operation="delete_tier1_gateway", resource=tier1_id, parameters={}, result="ok")
 
 
 @gateway_app.command("configure-tier0-bgp")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('configure_tier0_bgp', risk_level='medium')
 def gateway_configure_tier0_bgp(
     tier0_id: str,
     local_as: Annotated[int, typer.Option("--local-as", help="Local AS number")],

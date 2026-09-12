@@ -33,14 +33,14 @@ All write operations pass through multiple safety layers:
 1. **`@vmware_tool` decorator** — mandatory on every MCP tool; provides pre-checks, audit logging, data sanitization, and timeout control
 2. **Double confirmation** — CLI destructive commands (segment delete, gateway delete, NAT rule delete) require two separate "Are you sure?" prompts
 3. **`--dry-run` mode** — all CLI write commands support preview without execution
-4. **Dependency checks** — segment deletion verifies port count, gateway deletion checks for connected segments before proceeding
+4. **Dependency checks** — segment deletion refuses while ports are attached; Tier-1 gateway deletion checks first and refuses, deleting nothing, while segments, NAT rules, static routes, service interfaces, extra locale-services, or VPN / DNS forwarder / load balancer services still depend on it
 5. **Audit logging** — every operation (read and write) is logged to `~/.vmware/audit.db` (SQLite WAL) with timestamp, user, target, operation, parameters, and result
 6. **Policy engine** — `~/.vmware/rules.yaml` can deny operations by pattern, enforce maintenance windows, and set risk-level thresholds
 
 ### SSL/TLS Verification
 
 - TLS certificate verification is **enabled by default**
-- `disableSslCertValidation: true` exists solely for NSX Manager instances using self-signed certificates in isolated lab/home environments
+- `verify_ssl: false` exists solely for NSX Manager instances using self-signed certificates in isolated lab/home environments; for a private CA keep verification on and set `SSL_CERT_FILE` to a bundle containing it
 - In production, always use CA-signed certificates with full TLS verification
 
 ### Transitive Dependencies

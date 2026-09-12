@@ -87,7 +87,12 @@ def test_successful_string_delete_is_still_audited_ok(audited, tool_name, kwargs
     """
     import vmware_nsx.mcp_server.server as srv
 
-    with patch.object(srv, "_get_connection", return_value=object()), patch(ops_path):
+    # Every ops delete returns {"deleted": True, ...} on success, and the Tier-1
+    # wrapper only reports a delete the ops layer confirmed (a pre-flight may
+    # refuse), so a bare MagicMock return is not a success there.
+    with patch.object(srv, "_get_connection", return_value=object()), patch(
+        ops_path, return_value={"deleted": True}
+    ):
         result = getattr(srv, tool_name)(**kwargs)
 
     assert "deleted" in result and not result.startswith("Error:")

@@ -21,7 +21,7 @@ from vmware_nsx.cli._base import (
 
 @nat_app.command("create-rule")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('create_nat_rule', risk_level='medium')
 def nat_create_rule(
     tier1_id: Annotated[str, typer.Option("--tier1", help="Tier-1 gateway ID")],
     rule_id: Annotated[str, typer.Option("--rule-id", help="NAT rule ID")],
@@ -57,7 +57,7 @@ def nat_create_rule(
 
 @nat_app.command("delete-rule")
 @_cli_errors
-@guarded(risk_level='high')
+@guarded('delete_nat_rule', risk_level='high')
 def nat_delete_rule(
     tier1_id: Annotated[str, typer.Option("--tier1", help="Tier-1 gateway ID")],
     rule_id: Annotated[str, typer.Option("--rule-id", help="NAT rule ID to delete")],

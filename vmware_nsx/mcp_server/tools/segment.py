@@ -105,12 +105,13 @@ def update_segment(
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": True})
 @vmware_tool(risk_level="high")
 def delete_segment(segment_id: str, target: Optional[str] = None) -> str:
-    """[WRITE] Delete a network segment. WARNING: this disconnects all attached VMs.
+    """[WRITE] Delete a network segment; refuses while any port is attached.
 
-    Irreversible. Run get_segment on the same segment_id first and check
-    port_count — NSX refuses to delete a segment that still has attached ports —
-    and confirm with the user before deleting. Returns a confirmation string, or
-    an "Error: ..." string — not a dict.
+    Irreversible; confirm with the user first. Checks the segment's ports first
+    and refuses, deleting nothing, while any port (a VM vNIC or router
+    interface) is attached — it never disconnects them for you. get_segment
+    shows port_count. Returns a confirmation string, or an "Error: ..." string
+    naming the attached port ids — not a dict.
 
     Args:
         segment_id: Segment ID to delete, as returned by list_segments.
@@ -120,7 +121,14 @@ def delete_segment(segment_id: str, target: Optional[str] = None) -> str:
         from vmware_nsx.ops.segment_mgmt import delete_segment as _delete
 
         client = server._get_connection(target)
-        _delete(client, segment_id)
+        out = _delete(client, segment_id)
+        if not (isinstance(out, dict) and out.get("deleted") is True):
+            # The port check refused (or said nothing we can read as a delete).
+            # A string return is invisible to @vmware_tool, so declare it.
+            reason = out.get("error") if isinstance(out, dict) else None
+            msg = reason or "the ops layer did not confirm the delete."
+            report_tool_failure(msg)
+            return f"Error: Segment '{segment_id}' was NOT deleted. {msg}"
         return f"Segment '{segment_id}' deleted."
     except Exception as e:
         msg = _safe_error(e, "nsx")

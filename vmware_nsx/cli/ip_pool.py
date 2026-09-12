@@ -21,7 +21,7 @@ from vmware_nsx.cli._base import (
 
 @ip_pool_app.command("create")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('create_ip_pool', risk_level='medium')
 def ip_pool_create(
     pool_id: str,
     display_name: Annotated[str, typer.Option("--name", help="Display name")],
@@ -52,14 +52,26 @@ def ip_pool_create(
     subnet: dict = {"allocation_ranges": [{"start": start_ip, "end": end_ip}], "cidr": cidr}
     if gateway_ip:
         subnet["gateway_ip"] = gateway_ip
-    create_ip_pool(client, pool_id, display_name=display_name, subnets=[subnet])
+    out = create_ip_pool(client, pool_id, display_name=display_name, subnets=[subnet])
+    if out.get("error"):
+        # The pool exists but its subnet does not: a failed create. escape():
+        # the reason carries NSX-derived text, which Rich would read as markup.
+        from rich.markup import escape
+
+        console.print(f"[bold red]{escape(str(out['error']))}[/]")
+        cli._audit.log(
+            target=cli._resolve_target(target), operation="create_ip_pool", resource=pool_id,
+            parameters=params, after_state={k: out.get(k) for k in ("created", "subnets_created", "subnets_failed")},
+            result="error",
+        )
+        raise typer.Exit(1)
     console.print(f"[green]IP pool '{pool_id}' created.[/]")
     cli._audit.log(target=cli._resolve_target(target), operation="create_ip_pool", resource=pool_id, parameters=params, result="ok")
 
 
 @ip_pool_app.command("delete")
 @_cli_errors
-@guarded(risk_level='high')
+@guarded('delete_ip_pool', risk_level='high')
 def ip_pool_delete(
     pool_id: str,
     target: TargetOption = None,

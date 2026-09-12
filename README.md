@@ -153,7 +153,7 @@ vmware-nsx gateway routes-t1 app-t1
 # NAT
 vmware-nsx nat list app-t1
 vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10
-vmware-nsx nat delete app-t1 rule-01
+vmware-nsx nat delete-rule --tier1 app-t1 --rule-id rule-01
 
 # Static Routes
 vmware-nsx route list app-t1
@@ -258,7 +258,7 @@ More agent config templates (Claude Code, Cursor, Goose, Continue, etc.) in [exa
 | Read-heavy | 20/33 tools are read-only |
 | Double confirmation | CLI write commands require two prompts |
 | Dry-run mode | All write commands support `--dry-run` preview |
-| Dependency checks | Delete operations validate no connected resources |
+| Dependency checks | Segment delete refuses while ports are attached; Tier-1 delete refuses, deleting nothing, while segments, NAT rules, static routes, interfaces or VPN / DNS forwarder / LB services still depend on it (`--dry-run` runs the same check). Other deletes are not pre-checked |
 | Input validation | CIDR, IP, VLAN IDs, gateway existence validated |
 | Audit logging | All operations logged to `~/.vmware-nsx/audit.log` |
 | No firewall ops | Cannot create/modify DFW rules or security groups |

@@ -21,7 +21,7 @@ from vmware_nsx.cli._base import (
 
 @segment_app.command("create")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('create_segment', risk_level='medium')
 def segment_create(
     segment_id: str,
     display_name: Annotated[str, typer.Option("--name", help="Display name")],
@@ -64,7 +64,7 @@ def segment_create(
 
 @segment_app.command("update")
 @_cli_errors
-@guarded(risk_level='medium')
+@guarded('update_segment', risk_level='medium')
 def segment_update(
     segment_id: str,
     display_name: Annotated[str | None, typer.Option("--name", help="New display name")] = None,
@@ -104,33 +104,54 @@ def segment_update(
 
 @segment_app.command("delete")
 @_cli_errors
-@guarded(risk_level='high')
+@guarded('delete_segment', risk_level='high')
 def segment_delete(
     segment_id: str,
     target: TargetOption = None,
     config: ConfigOption = None,
     dry_run: DryRunOption = False,
 ) -> None:
-    """Delete a segment (destructive!)."""
+    """Delete a segment (destructive!). Refuses, deleting nothing, while ports are attached."""
+    from rich.markup import escape
+
     from vmware_nsx.ops.inventory import get_segment
-    from vmware_nsx.ops.segment_mgmt import delete_segment
+    from vmware_nsx.ops.segment_mgmt import delete_segment, segment_delete_blockers
 
     client, _ = cli._get_connection(target, config)
     info = get_segment(client, segment_id)
     if dry_run:
+        # The same read-only port check the real run makes, so the preview
+        # cannot promise a delete the real run would refuse.
+        blockers = segment_delete_blockers(client, segment_id)
         _dry_run_print(
             target=cli._resolve_target(target),
             resource=segment_id,
             operation="delete_segment",
-            api_call=f"DELETE /policy/api/v1/infra/segments/{segment_id}",
+            api_call=(
+                "none — ports are attached, a real run would refuse" if blockers
+                else f"DELETE /policy/api/v1/infra/segments/{segment_id}"
+            ),
             before_state={"port_count": info.get("port_count"), "admin_state": info.get("admin_state")},
             resource_label="Segment",
         )
+        if blockers:
+            # escape(): ids come from NSX, and Rich would swallow "[...]" as markup.
+            console.print(
+                f"[bold red]A real run would be REFUSED: {blockers['port_count']} attached port(s) "
+                f"{escape(str(blockers['port_ids']))}. Detach them first.[/]"
+            )
         return
     port_count = info.get("port_count", 0)
     if port_count and port_count > 0:
-        console.print(f"[bold red]WARNING: Segment has {port_count} active ports![/]")
+        console.print(f"[bold red]WARNING: Segment has {port_count} active ports — the delete will be refused.[/]")
     cli._double_confirm("delete segment", segment_id, cli._resolve_target(target), resource_type="Segment")
-    delete_segment(client, segment_id)
+    out = delete_segment(client, segment_id)
+    if out.get("deleted") is not True:
+        console.print(f"[bold red]Segment '{segment_id}' was NOT deleted. {escape(str(out.get('error', '')))}[/]")
+        cli._audit.log(
+            target=cli._resolve_target(target), operation="delete_segment", resource=segment_id,
+            parameters={}, after_state={"deleted": False, "port_ids": out.get("port_ids", [])}, result="error",
+        )
+        raise typer.Exit(1)
     console.print(f"[green]Segment '{segment_id}' deleted.[/]")
     cli._audit.log(target=cli._resolve_target(target), operation="delete_segment", resource=segment_id, parameters={}, result="ok")

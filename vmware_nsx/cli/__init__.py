@@ -65,6 +65,9 @@ from vmware_nsx.cli import (  # noqa: E402
     troubleshoot,
 )
 import sys
+# Registers this skill's environment resolver, so environment-scoped policy
+# rules apply to @guarded CLI writes exactly as they do to MCP tools.
+import vmware_nsx.policy_environment  # noqa: F401 — imported to register the resolver; do not remove
 
 
 def _harden_console_encoding() -> None:

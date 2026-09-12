@@ -167,7 +167,7 @@ def test_a_string_returning_delete_that_failed_is_recorded_as_error(audit_log):
 
 def test_a_string_returning_delete_that_succeeded_is_recorded_as_ok(audit_log):
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
-        "vmware_nsx.ops.segment_mgmt.delete_segment", return_value=None
+        "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"deleted": True, "segment_id": "seg-1"}
     ):
         out = srv.delete_segment("seg-1")
     assert not out.startswith("Error:")
@@ -196,7 +196,7 @@ def test_the_audited_subject_is_the_object_never_the_manager():
 
 def test_the_declared_target_is_audited(audit_log):
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
-        "vmware_nsx.ops.segment_mgmt.delete_segment", return_value=None
+        "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"deleted": True, "segment_id": "seg-1"}
     ):
         srv.delete_segment("seg-1", target="nsx-dc2")
     assert [r["target"] for r in audit_log()] == ["nsx-dc2"]
@@ -247,7 +247,7 @@ def test_a_broken_audit_sink_does_not_break_the_write(monkeypatch):
     monkeypatch.setattr(_write_audit, "_audit", exploding)
 
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
-        "vmware_nsx.ops.segment_mgmt.delete_segment", return_value=None
+        "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"deleted": True, "segment_id": "seg-1"}
     ):
         assert srv.delete_segment("seg-1") == "Segment 'seg-1' deleted."
     assert exploding.log.called

@@ -1,3 +1,82 @@
+## v1.9.0 — a refused delete is reported as refused
+
+**Tier-1 delete checks first and deletes nothing when it refuses.** It removed the gateway's
+default locale-service and then failed on the gateway itself when anything still depended on it,
+leaving a gateway with no edge binding. It now refuses up front while segments (global or
+Tier-1-scoped), NAT rules, static routes, interfaces, IPsec or L2 VPN services, a DNS forwarder,
+load-balancer services or another locale-service remain, and lists them. `--dry-run` runs the same
+check.
+
+**What the check needs.** The account that deletes a Tier-1 now also needs *read* access to every
+section the check looks at: all segments and all load-balancer services (read in full — the
+Policy API cannot filter them by gateway, so on a large NSX this is a walk over every segment),
+and the gateway's NAT rules, static routes, locale-services and interfaces, IPsec and L2 VPN
+services and DNS forwarder. A 404 counts as "none there"; **any other failed read — a permission
+error included — stops the delete before anything is removed** rather than guessing the gateway
+is clear, so an account that could delete a Tier-1 before this release may be stopped now. The
+error gives the HTTP status of the read that failed, followed by its path.
+
+**Refusals reach the user.** `delete_tier1_gateway` and `delete_segment` discarded the ops layer's
+refusal and printed "deleted"; the audit said `ok`. Both surfaces now report the refusal, audit
+`error`, and the CLI exits 1. `create_ip_pool` reported success when its subnet failed; that is
+now an error that says the pool exists and how to clean up.
+
+Docs: the setup guide's config examples did not load (`targets` as a list), the first example
+disabled TLS verification for a production target, routing claimed "any networking task", and
+several safety claims (certificate auth, input range checks, a gateway pre-check) described code
+that did not exist. All corrected against the code.
+
+**CLI writes are authorised and audited under their MCP tool names.** A deny rule
+in `~/.vmware/rules.yaml` names an operation, and the 13 guarded CLI commands were
+checked under their Python function names instead — so a rule against
+`delete_segment` stopped the agent and let `segment delete` do the same thing from
+a shell. One rule now scopes both surfaces:
+
+| CLI command | Operation name (was) |
+|---|---|
+| `segment create` | `create_segment` (`segment_create`) |
+| `segment update` | `update_segment` (`segment_update`) |
+| `segment delete` | `delete_segment` (`segment_delete`) |
+| `gateway create-tier1` | `create_tier1_gateway` (`gateway_create_tier1`) |
+| `gateway update-tier1` | `update_tier1_gateway` (`gateway_update_tier1`) |
+| `gateway delete-tier1` | `delete_tier1_gateway` (`gateway_delete_tier1`) |
+| `gateway configure-tier0-bgp` | `configure_tier0_bgp` (`gateway_configure_tier0_bgp`) |
+| `nat create-rule` | `create_nat_rule` (`nat_create_rule`) |
+| `nat delete-rule` | `delete_nat_rule` (`nat_delete_rule`) |
+| `route create-static` | `create_static_route` (`route_create_static`) |
+| `route delete-static` | `delete_static_route` (`route_delete_static`) |
+| `ip-pool create` | `create_ip_pool` (`ip_pool_create`) |
+| `ip-pool delete` | `delete_ip_pool` (`ip_pool_delete`) |
+
+Risk levels were already equal to the MCP tools' and are unchanged. **Audit rows
+for these commands carry the new names from this release on**; rows written
+before it keep the old ones, so a query over `~/.vmware/audit.db` that spans the
+upgrade needs both. A rule you wrote against an old name no longer matches —
+rename it to the MCP tool name. A regression test now derives each command's MCP
+twin from the ops function both call and fails if the names or risks drift.
+
+**Environment-scoped deny rules now apply to CLI writes.** The skill's environment resolver was
+registered only when the MCP server was imported, which the CLI never does — so a
+`freeze-production-writes` rule stopped the MCP tool and not the CLI command doing the same
+thing. It now lives in `policy_environment.py`, imported by both surfaces. (With vmware-policy
+1.13.1 the CLI's `--config` file is the one whose labels are judged.)
+
+**OpenClaw could not show this skill to the model.** `metadata.openclaw.requires` listed
+config *file paths* under `requires.config`, which OpenClaw reads as `openclaw.json` keys that
+must be truthy — so the skill was "needs setup / not visible to the model" whatever was on disk
+(verified on OpenClaw 2026.6.35). `requires.env` named an optional override and `requires.bins`
+demanded a CLI that a plugin install (uvx) never has. `requires` is now `anyBins: [<cli>, "uvx"]`;
+the variables are still declared, under `optional.env`.
+
+**Install commands in the skill pin this release.** ClawHub reviews SKILL.md and references/,
+not the package they install, so an unpinned `uv tool install` vouched for code nobody reviewed.
+Every install command for this package in the skill now names this version.
+
+**A config path written as `~/…` now resolves.** Every MCP example config and setup-guide snippet
+sets `VMWARE_NSX_CONFIG` to `~/.vmware-nsx/config.yaml`, but MCP clients pass env values verbatim and the
+path was used unexpanded, so copying the snippet gave "Config file not found" for a file that was
+there. `~` is now expanded in the variable and in `--config`.
+
 ## v1.8.16 — one answer per .env, on every platform
 
 `.env` permissions are decided by `vmware_policy.fsperms` instead of POSIX mode

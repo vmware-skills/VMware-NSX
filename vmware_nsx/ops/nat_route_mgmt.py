@@ -329,12 +329,15 @@ def create_ip_pool(
             client.put(subnet_path, subnet_body)
             subnets_created.append(subnet_id)
         except Exception as exc:  # noqa: BLE001 — report, don't raise past first
-            subnets_failed.append({"subnet": subnet_id, "error": str(exc)})
+            subnets_failed.append({"subnet": subnet_id, "error": _subnet_error_text(exc)})
+            # Full detail goes to the operator's log only; the result carries
+            # authored text (see _subnet_error_text).
             _log.warning(
                 "IP pool %s subnet %s failed: %s",
                 pool_id,
                 subnet_id,
                 exc,
+                exc_info=True,
             )
 
     _log.info(
@@ -344,12 +347,49 @@ def create_ip_pool(
         len(subnets_created),
         len(subnets),
     )
-    return {
+    result: dict[str, Any] = {
         "created": True,
         "pool_id": pool_id,
         "subnets_created": subnets_created,
         "subnets_failed": subnets_failed,
     }
+    if subnets_failed:
+        # A failed subnet is a failed create (maintainer decision 2026-09-11):
+        # a top-level ``error`` makes both audit sinks record it as one, while
+        # ``created`` stays True because the pool object does exist.
+        result["error"] = _partial_pool_message(pool_id, len(subnets), subnets_created, subnets_failed)
+    return result
+
+
+def _subnet_error_text(exc: Exception) -> str:
+    """Why one subnet PUT failed, in text safe to hand back.
+
+    ``NsxApiError`` is the connection layer's own translation — status, hint
+    and path, authored and never quoting the transport exception or response
+    body — so it passes, sanitized and capped. Anything else is unplanned, and
+    its text (written for a traceback) can carry host:port or a response body:
+    only its type is reported, the same rule ``_safe_error`` applies on the MCP
+    surface.
+    """
+    from vmware_nsx.connection import NsxApiError
+
+    if isinstance(exc, NsxApiError):
+        return sanitize(str(exc), 300)
+    return f"{type(exc).__name__}: the subnet request failed (details in the vmware-nsx log)."
+
+
+def _partial_pool_message(
+    pool_id: str, total: int, created: list[str], failed: list[dict[str, Any]]
+) -> str:
+    reasons = "; ".join(f"{f['subnet']}: {f['error']}" for f in failed)
+    return (
+        f"IP pool '{pool_id}' WAS created, but {len(failed)} of {total} subnet(s) "
+        f"were not ({reasons}). The pool has {len(created)} working subnet(s). "
+        "Nothing here adds a subnet to an existing pool, so to finish: delete the "
+        f"pool with delete_ip_pool (CLI: vmware-nsx ip-pool delete {pool_id}), fix "
+        "the cause above, then run create_ip_pool (CLI: vmware-nsx ip-pool create) "
+        "again."
+    )
 
 
 def delete_ip_pool(

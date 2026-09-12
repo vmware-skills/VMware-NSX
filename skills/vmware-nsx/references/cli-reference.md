@@ -274,7 +274,9 @@ vmware-nsx segment update app-web-seg --subnet 10.10.2.1/24 --dry-run
 
 ### `segment delete`
 
-Delete a segment (destructive). Warns when the segment has active ports.
+Delete a segment (destructive). Refuses — exit code 1, nothing deleted,
+attached port ids printed — while any port is attached. `--dry-run` runs the
+same read-only port check and shows whether a real run would be refused.
 
 ```bash
 vmware-nsx segment delete app-web-seg --dry-run
@@ -317,8 +319,12 @@ vmware-nsx gateway update-tier1 app-t1 --advertise TIER1_CONNECTED,TIER1_NAT
 
 ### `gateway delete-tier1`
 
-Delete a Tier-1 gateway (destructive). Removes the default locale-service
-first when present.
+Delete a Tier-1 gateway (destructive). Checks first and refuses — exit code 1,
+nothing deleted, blocking ids printed — while segments, NAT rules, static
+routes, service interfaces, extra locale-services, or VPN / DNS forwarder / LB
+services still depend on it. `--dry-run` runs the same read-only check and
+shows what blocks. When clear, removes the default locale-service, then the
+gateway.
 
 ```bash
 vmware-nsx gateway delete-tier1 app-t1 --dry-run
@@ -406,7 +412,9 @@ vmware-nsx route delete-static --tier1 app-t1 --route-id r1
 
 ### `ip-pool create`
 
-Create a new IP address pool with one allocation range.
+Create a new IP address pool with one allocation range. If NSX rejects the
+subnet, the pool is left without it: the command prints why and how to clean up
+(`vmware-nsx ip-pool delete <pool_id>`, then create again) and exits 1.
 
 ```bash
 vmware-nsx ip-pool create pool-01 --name "App Pool" --start 192.168.1.10 --end 192.168.1.100 --cidr 192.168.1.0/24 --gateway 192.168.1.1

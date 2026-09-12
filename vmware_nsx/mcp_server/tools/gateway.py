@@ -115,14 +115,16 @@ def update_tier1_gateway(
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": True})
 @vmware_tool(risk_level="high")
 def delete_tier1_gateway(tier1_id: str, target: Optional[str] = None) -> str:
-    """[WRITE] Delete a Tier-1 gateway. WARNING: removes attached segments and NAT rules.
+    """[WRITE] Delete a Tier-1 gateway; refuses while anything still depends on it.
 
-    Irreversible. Run get_tier1_gateway and list_nat_rules on the same tier1_id
-    first to see what goes with it, and confirm with the user before deleting.
-    Also removes the gateway's "default" locale-service first (the Policy API
-    refuses to delete a Tier-1 that still has children); a missing
-    locale-service is ignored. Returns a confirmation string, or an "Error: ..."
-    string — not a dict.
+    Irreversible; confirm with the user first. Checks first (read-only) and
+    refuses, deleting nothing, while any remain: attached segments or
+    Tier-1-scoped segments, NAT rules, static routes, service interfaces,
+    extra locale-services, IPsec/L2 VPN services, a DNS forwarder, or a load
+    balancer service attached to it. It never removes them for you. When clear,
+    deletes the "default" locale-service, then the gateway. Returns a
+    confirmation string, or an "Error: ..." string naming the blocking ids —
+    not a dict.
 
     Args:
         tier1_id: Gateway ID to delete, as returned by list_tier1_gateways.
@@ -132,7 +134,14 @@ def delete_tier1_gateway(tier1_id: str, target: Optional[str] = None) -> str:
         from vmware_nsx.ops.segment_mgmt import delete_tier1_gateway as _delete
 
         client = server._get_connection(target)
-        _delete(client, tier1_id)
+        out = _delete(client, tier1_id)
+        if not (isinstance(out, dict) and out.get("deleted") is True):
+            # The pre-flight refused (or said nothing we can read as a delete).
+            # A string return is invisible to @vmware_tool, so declare it.
+            reason = out.get("error") if isinstance(out, dict) else None
+            msg = reason or "the ops layer did not confirm the delete."
+            report_tool_failure(msg)
+            return f"Error: Tier-1 gateway '{tier1_id}' was NOT deleted. {msg}"
         return f"Tier-1 gateway '{tier1_id}' deleted."
     except Exception as e:
         msg = _safe_error(e, "nsx")

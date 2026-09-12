@@ -43,10 +43,9 @@ For monitoring, use vmware-monitor.
 import logging
 from typing import Any, Optional
 
-from vmware_policy import describe_tool_parameters, mtime_cached_loader, set_environment_resolver
-from vmware_policy import skill_name
+from vmware_policy import describe_tool_parameters
 
-from vmware_nsx.config import CONFIG_FILE, load_config
+from vmware_nsx.config import load_config
 from vmware_nsx.connection import ConnectionManager
 
 # Re-exported so callers and tests can keep using ``vmware_nsx.mcp_server.server.<name>``.
@@ -123,33 +122,10 @@ del _mod, _name, _obj
 # Environment declaration
 # ---------------------------------------------------------------------------
 
-
-_cached_config = mtime_cached_loader("VMWARE_NSX_CONFIG", CONFIG_FILE, load_config)
-
-
-def _environment_for(target: Optional[str]) -> str:
-    """Report the environment a target declares, for policy scoping.
-
-    Policy rules scope by environment ("irreversible work in production needs a
-    second person"), and vmware-policy cannot read this skill's config itself.
-    Registering this lookup is what lets those rules fire at all. Reloaded on
-    config.yaml mtime change so an edit takes effect without restarting the
-    server. The config is cached via :func:`vmware_policy.mtime_cached_loader`,
-    so repeated tool calls pay one ``os.stat`` instead of a full YAML parse.
-    """
-    try:
-        return _cached_config().environment_for(target)
-    except Exception:  # noqa: BLE001 — an unreadable config means "undeclared"
-        return ""
-
-
-# Keyed by skill: the registry used to be one process-global slot, and a
-# bare `import` of any sibling's server module replaced whichever resolver
-# was there -- measured turning a freeze-production-writes rule from DENY
-# to ALLOW. Keyed, a resolver only ever answers for its own skill, so
-# registering at import time is safe again.
-set_environment_resolver(_environment_for, skill=skill_name(__name__))
-
+# The environment resolver lives in policy_environment so the CLI registers
+# it too (its @guarded writes go through the same guard()); importing it here
+# registers it for the MCP surface.
+from vmware_nsx.policy_environment import _cached_config, _environment_for  # noqa: F401 — imported to register the resolver, and re-exported
 
 # ---------------------------------------------------------------------------
 # Entry point

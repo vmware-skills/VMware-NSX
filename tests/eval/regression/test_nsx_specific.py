@@ -559,8 +559,13 @@ def test_delete_tier1_gateway_removes_default_locale_service_first() -> None:
     from vmware_nsx.connection import NsxApiError
     from vmware_nsx.ops.segment_mgmt import delete_tier1_gateway
 
+    # The pre-flight reads the DNS forwarder with client.get; 404 = none. (A bare
+    # MagicMock return would read as "a forwarder is configured" and refuse.)
+    no_forwarder = NsxApiError("404", status_code=404, method="GET", path="/dns-forwarder")
+
     # Case 1: locale-service exists — deleted first, then the gateway.
     client = _mock_client()
+    client.get.side_effect = no_forwarder
     result = delete_tier1_gateway(client, "t1-del")
     paths = [c.args[0] for c in client.delete.call_args_list]
     assert paths == [
@@ -573,6 +578,7 @@ def test_delete_tier1_gateway_removes_default_locale_service_first() -> None:
     # Since the central _request() translation, the connection layer raises
     # NsxApiError (not httpx.HTTPStatusError) for HTTP error statuses.
     client = _mock_client()
+    client.get.side_effect = no_forwarder
     err = NsxApiError("404", status_code=404, method="DELETE", path="/x")
     client.delete.side_effect = [err, None]
     result = delete_tier1_gateway(client, "t1-del")
