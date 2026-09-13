@@ -98,7 +98,7 @@ vmware-nsx doctor
 ### Create an App Network (Segment + T1 Gateway + NAT)
 
 1. Create gateway: `vmware-nsx gateway create-t1 app-t1 --edge-cluster edge-cluster-01 --tier0 tier0-gw`
-2. Create segment: `vmware-nsx segment create app-web-seg --gateway app-t1 --subnet 10.10.1.1/24 --transport-zone tz-overlay`
+2. Create segment: `vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24`
 3. Add SNAT: `vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10`
 4. Verify: `vmware-nsx segment list` and `vmware-nsx nat list app-t1`
 
@@ -140,7 +140,7 @@ Full per-tool endpoints and methods: `skills/vmware-nsx/references/capabilities.
 # Segments
 vmware-nsx segment list
 vmware-nsx segment get app-web-seg
-vmware-nsx segment create app-web-seg --gateway app-t1 --subnet 10.10.1.1/24 --transport-zone tz-overlay
+vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24
 vmware-nsx segment delete app-web-seg
 
 # Gateways

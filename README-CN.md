@@ -182,7 +182,7 @@ targets:
 ### 创建应用网络（Segment + T1 网关 + NAT）
 
 1. 创建网关：`vmware-nsx gateway create-t1 app-t1 --edge-cluster edge-cluster-01 --tier0 tier0-gw`
-2. 创建 Segment：`vmware-nsx segment create app-web-seg --gateway app-t1 --subnet 10.10.1.1/24 --transport-zone tz-overlay`
+2. 创建 Segment：`vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24`
 3. 添加 SNAT：`vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10`
 4. 验证：`vmware-nsx segment list` 和 `vmware-nsx nat list app-t1`
 
@@ -208,7 +208,7 @@ targets:
 # Segment
 vmware-nsx segment list
 vmware-nsx segment get app-web-seg
-vmware-nsx segment create app-web-seg --gateway app-t1 --subnet 10.10.1.1/24 --transport-zone tz-overlay
+vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24
 vmware-nsx segment delete app-web-seg
 
 # 网关
