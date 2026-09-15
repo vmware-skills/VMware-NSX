@@ -7,12 +7,12 @@
     "url": "https://github.com/vmware-skills/VMware-NSX",
     "source": "github"
   },
-  "version": "1.9.0",
+  "version": "1.9.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "vmware-nsx-mgmt",
-      "version": "1.9.0",
+      "version": "1.9.1",
       "runtimeHint": "uvx",
       "runtimeArguments": [
         {

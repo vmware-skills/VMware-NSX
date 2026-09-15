@@ -10,10 +10,12 @@ from vmware_nsx.cli._base import (
     console,
     troubleshoot_app,
 )
+from vmware_policy import audited
 
 
 @troubleshoot_app.command("port-status")
 @_cli_errors
+@audited("get_logical_port_status")
 def troubleshoot_port_status(
     segment_id: str,
     target: TargetOption = None,
@@ -30,6 +32,7 @@ def troubleshoot_port_status(
 
 @troubleshoot_app.command("vm-segment")
 @_cli_errors
+@audited("get_segment_port_for_vm")
 def troubleshoot_vm_segment(
     vm_display_name: str,
     target: TargetOption = None,

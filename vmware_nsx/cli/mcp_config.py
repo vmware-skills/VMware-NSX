@@ -9,6 +9,7 @@ import typer
 from rich.table import Table
 
 from vmware_nsx.cli._base import _cli_errors, console, mcp_config_app
+from vmware_policy import cli_local
 
 _AGENT_TEMPLATES = {
     "goose": "goose.json",
@@ -35,6 +36,7 @@ _AGENT_INSTALL_PATHS: dict[str, Path] = {
 
 @mcp_config_app.command("generate")
 @_cli_errors
+@cli_local("writes or lists local MCP client config files")
 def mcp_config_generate(
     agent: Annotated[
         str,
@@ -86,6 +88,7 @@ def mcp_config_generate(
 
 @mcp_config_app.command("list")
 @_cli_errors
+@cli_local("writes or lists local MCP client config files")
 def mcp_config_list() -> None:
     """List all supported agents."""
     table = Table(title="Supported Agents")
@@ -98,6 +101,7 @@ def mcp_config_list() -> None:
 
 @mcp_config_app.command("install")
 @_cli_errors
+@cli_local("writes or lists local MCP client config files")
 def mcp_config_install(
     agent: Annotated[
         str,

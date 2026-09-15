@@ -15,10 +15,12 @@ from vmware_nsx.cli._base import (
     print_next_page,
     networking_app,
 )
+from vmware_policy import audited
 
 
 @networking_app.command("list-nat-rules")
 @_cli_errors
+@audited("list_nat_rules")
 def networking_list_nat_rules(
     tier1_id: str,
     limit: LimitOption = 50,
@@ -55,6 +57,7 @@ def networking_list_nat_rules(
 
 @networking_app.command("bgp-neighbors")
 @_cli_errors
+@audited("get_bgp_neighbors")
 def networking_bgp_neighbors(
     tier0_id: str,
     target: TargetOption = None,
@@ -98,6 +101,7 @@ def networking_bgp_neighbors(
 
 @networking_app.command("list-static-routes")
 @_cli_errors
+@audited("list_static_routes")
 def networking_list_static_routes(
     tier1_id: str,
     limit: LimitOption = 50,
@@ -125,6 +129,7 @@ def networking_list_static_routes(
 
 @networking_app.command("list-ip-pools")
 @_cli_errors
+@audited("list_ip_pools")
 def networking_list_ip_pools(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
@@ -150,6 +155,7 @@ def networking_list_ip_pools(
 
 @networking_app.command("ip-pool-usage")
 @_cli_errors
+@audited("get_ip_pool_usage")
 def networking_ip_pool_usage(
     pool_id: str,
     target: TargetOption = None,

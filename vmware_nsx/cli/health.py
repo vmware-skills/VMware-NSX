@@ -18,10 +18,12 @@ from vmware_nsx.cli._base import (
     print_next_page,
     health_app,
 )
+from vmware_policy import audited
 
 
 @health_app.command("alarms")
 @_cli_errors
+@audited("list_nsx_alarms")
 def health_alarms(
     severity: Annotated[
         str,
@@ -66,6 +68,7 @@ def health_alarms(
 
 @health_app.command("transport-node-status")
 @_cli_errors
+@audited("get_transport_node_status")
 def health_transport_node_status(
     node_id: str,
     target: TargetOption = None,
@@ -82,6 +85,7 @@ def health_transport_node_status(
 
 @health_app.command("edge-cluster-status")
 @_cli_errors
+@audited("get_edge_cluster_status")
 def health_edge_cluster_status(
     cluster_id: str,
     target: TargetOption = None,
@@ -98,6 +102,7 @@ def health_edge_cluster_status(
 
 @health_app.command("manager-status")
 @_cli_errors
+@audited("get_nsx_manager_status")
 def health_manager_status(
     target: TargetOption = None,
     config: ConfigOption = None,

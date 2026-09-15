@@ -42,6 +42,7 @@ from vmware_nsx.cli._base import (  # noqa: F401
     segment_app,
     troubleshoot_app,
 )
+from vmware_policy import audited, cli_local
 
 app = typer.Typer(
     name="vmware-nsx",
@@ -160,6 +161,7 @@ mcp_config_install = mcp_config.mcp_config_install
 
 @app.command("init")
 @_cli_errors
+@audited("init")
 def init_cmd(
     force: Annotated[
         bool,
@@ -187,6 +189,7 @@ def init_cmd(
 
 @app.command("doctor")
 @_cli_errors
+@audited("doctor")
 def doctor_cmd(
     skip_auth: Annotated[
         bool,
@@ -202,6 +205,7 @@ def doctor_cmd(
 
 @app.command("mcp")
 @_cli_errors
+@cli_local("starts the MCP server; its tools audit themselves")
 def mcp_cmd() -> None:
     """Start the MCP server (stdio transport).
 

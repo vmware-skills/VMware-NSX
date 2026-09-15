@@ -1,3 +1,17 @@
+## v1.9.1 — CLI reads are audited
+
+No CLI read wrote `~/.vmware/audit.db` — only MCP calls and CLI writes (`@guarded`) did. A live
+`vmware-aria resource list` left the audit row count unchanged while the same read over MCP added a row.
+
+Every CLI command that reaches NSX now passes the same `guard()` as its MCP twin and writes one
+audit row under that tool's name (22 commands, `@audited`). Commands that reach nothing remote say so, with a reason (4, `@cli_local`).
+A family gate now fails any CLI command that declares none of `@guarded` / `@audited` / `@cli_local`.
+
+**Behaviour change:** a deny rule in `~/.vmware/rules.yaml` whose `operations` name a read tool now stops
+that CLI command too, as it already stopped the MCP call.
+
+Requires `vmware-policy>=1.15.0`.
+
 ## v1.9.0 — a refused delete is reported as refused
 
 **Tier-1 delete checks first and deletes nothing when it refuses.** It removed the gateway's

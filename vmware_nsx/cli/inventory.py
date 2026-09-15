@@ -15,10 +15,12 @@ from vmware_nsx.cli._base import (
     print_next_page,
     inventory_app,
 )
+from vmware_policy import audited
 
 
 @inventory_app.command("list-segments")
 @_cli_errors
+@audited("list_segments")
 def inventory_list_segments(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
@@ -54,6 +56,7 @@ def inventory_list_segments(
 
 @inventory_app.command("get-segment")
 @_cli_errors
+@audited("get_segment")
 def inventory_get_segment(
     segment_id: str,
     target: TargetOption = None,
@@ -70,6 +73,7 @@ def inventory_get_segment(
 
 @inventory_app.command("list-tier0s")
 @_cli_errors
+@audited("list_tier0_gateways")
 def inventory_list_tier0s(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
@@ -95,6 +99,7 @@ def inventory_list_tier0s(
 
 @inventory_app.command("get-tier0")
 @_cli_errors
+@audited("get_tier0_gateway")
 def inventory_get_tier0(
     tier0_id: str,
     target: TargetOption = None,
@@ -111,6 +116,7 @@ def inventory_get_tier0(
 
 @inventory_app.command("list-tier1s")
 @_cli_errors
+@audited("list_tier1_gateways")
 def inventory_list_tier1s(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
@@ -136,6 +142,7 @@ def inventory_list_tier1s(
 
 @inventory_app.command("get-tier1")
 @_cli_errors
+@audited("get_tier1_gateway")
 def inventory_get_tier1(
     tier1_id: str,
     target: TargetOption = None,
@@ -152,6 +159,7 @@ def inventory_get_tier1(
 
 @inventory_app.command("list-transport-zones")
 @_cli_errors
+@audited("list_transport_zones")
 def inventory_list_transport_zones(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
@@ -176,6 +184,7 @@ def inventory_list_transport_zones(
 
 @inventory_app.command("list-transport-nodes")
 @_cli_errors
+@audited("list_transport_nodes")
 def inventory_list_transport_nodes(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
@@ -203,6 +212,7 @@ def inventory_list_transport_nodes(
 
 @inventory_app.command("list-edge-clusters")
 @_cli_errors
+@audited("list_edge_clusters")
 def inventory_list_edge_clusters(
     limit: LimitOption = 50,
     offset: OffsetOption = 0,
