@@ -44,6 +44,9 @@ PROBE = "probe-id"
 
 _PLACEHOLDER: dict[object, object] = {str: PROBE, int: 1, float: 1.0, bool: False}
 
+#: A blast radius with nothing in the way, for tests about the audit, not the gate.
+_CLEAR = {"blockers": [], "unmeasured": []}
+
 
 def _tool_names(read_only: bool) -> frozenset[str]:
     """Tool names whose ``readOnlyHint`` annotation is ``not read_only``."""
@@ -107,7 +110,8 @@ def test_every_mcp_write_tool_records_to_the_skill_audit_log(name, audit_log):
     assert row["resource"] == PROBE, f"{name} audited resource={row['resource']!r}, expected the id it acted on"
     assert row["target"] == "default", f"{name} audited target={row['target']!r} for an omitted target"
     assert row["skill"] == "nsx"
-    assert row["result"] in {"ok", "error"}, f"{name} audited an unexpected result {row['result']!r}"
+    # "preview": a gated delete called without confirm=True changes nothing.
+    assert row["result"] in {"ok", "error", "preview"}, f"{name} audited an unexpected result {row['result']!r}"
 
 
 def test_the_registered_tool_and_the_module_attribute_are_one_object():
@@ -149,29 +153,41 @@ def test_a_write_that_returns_an_error_envelope_is_recorded_as_error(audit_log):
     assert [r["result"] for r in audit_log()] == ["error"]
 
 
-def test_a_string_returning_delete_that_failed_is_recorded_as_error(audit_log):
-    """The five deletes return a sentence, not an envelope.
+def test_a_delete_that_failed_is_recorded_as_error(audit_log):
+    """The deletes returned a sentence until the confirmation gate; now the envelope.
 
-    ``@vmware_tool`` deliberately does not sniff strings, which is why those
-    tools call ``report_tool_failure``. This log has no such signal to read, so
-    it reads the contract those tools document: a confirmation sentence, or one
-    beginning "Error:".
+    Either way the row must say ``error`` when the delete did not happen.
     """
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
+        "vmware_nsx.ops.delete_gate.segment_delete_blast_radius", return_value=dict(_CLEAR)
+    ), patch(
         "vmware_nsx.ops.segment_mgmt.delete_segment", side_effect=NsxApiError("nope", status_code=404)
     ):
-        out = srv.delete_segment("seg-1")
-    assert out.startswith("Error:")
+        out = srv.delete_segment("seg-1", confirm=True)
+    assert "error" in out
     assert [r["result"] for r in audit_log()] == ["error"]
 
 
-def test_a_string_returning_delete_that_succeeded_is_recorded_as_ok(audit_log):
+def test_a_delete_that_succeeded_is_recorded_as_ok(audit_log):
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
+        "vmware_nsx.ops.delete_gate.segment_delete_blast_radius", return_value=dict(_CLEAR)
+    ), patch(
         "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"deleted": True, "segment_id": "seg-1"}
     ):
-        out = srv.delete_segment("seg-1")
-    assert not out.startswith("Error:")
+        out = srv.delete_segment("seg-1", confirm=True)
+    assert out["action"] == "deleted"
     assert [r["result"] for r in audit_log()] == ["ok"]
+
+
+def test_a_delete_preview_is_recorded_as_preview_not_ok(audit_log):
+    """A bare call deletes nothing; ``ok`` would read as a deletion."""
+    with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
+        "vmware_nsx.ops.delete_gate.segment_delete_blast_radius", return_value=dict(_CLEAR)
+    ), patch("vmware_nsx.ops.segment_mgmt.delete_segment") as ops:
+        out = srv.delete_segment("seg-1")
+    ops.assert_not_called()
+    assert out["action"] == "preview"
+    assert [r["result"] for r in audit_log()] == ["preview"]
 
 
 def test_the_audited_subject_is_the_object_never_the_manager():
@@ -196,9 +212,11 @@ def test_the_audited_subject_is_the_object_never_the_manager():
 
 def test_the_declared_target_is_audited(audit_log):
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
+        "vmware_nsx.ops.delete_gate.segment_delete_blast_radius", return_value=dict(_CLEAR)
+    ), patch(
         "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"deleted": True, "segment_id": "seg-1"}
     ):
-        srv.delete_segment("seg-1", target="nsx-dc2")
+        srv.delete_segment("seg-1", confirm=True, target="nsx-dc2")
     assert [r["target"] for r in audit_log()] == ["nsx-dc2"]
 
 
@@ -247,7 +265,9 @@ def test_a_broken_audit_sink_does_not_break_the_write(monkeypatch):
     monkeypatch.setattr(_write_audit, "_audit", exploding)
 
     with patch.object(srv, "_get_connection", return_value=MagicMock()), patch(
+        "vmware_nsx.ops.delete_gate.segment_delete_blast_radius", return_value=dict(_CLEAR)
+    ), patch(
         "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"deleted": True, "segment_id": "seg-1"}
     ):
-        assert srv.delete_segment("seg-1") == "Segment 'seg-1' deleted."
+        assert srv.delete_segment("seg-1", confirm=True)["action"] == "deleted"
     assert exploding.log.called

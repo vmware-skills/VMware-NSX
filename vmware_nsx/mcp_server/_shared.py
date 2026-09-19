@@ -15,11 +15,15 @@ from vmware_policy import sanitize
 
 from vmware_nsx.config import ConfigError
 from vmware_nsx.connection import NsxApiError
+from vmware_nsx.ops.delete_gate import DeleteRefusedError
 from vmware_nsx import __version__
 
 logger = logging.getLogger("mcp_server")
 
 _DOCTOR_HINT = "Run 'vmware-nsx doctor' to verify connectivity."
+
+#: Longest gate refusal passed to the caller (see ``_safe_error``).
+_REFUSAL_MAX = 2000
 
 
 def _safe_error(exc: Exception, tool: str) -> str:
@@ -78,6 +82,12 @@ def _safe_error(exc: Exception, tool: str) -> str:
     logger.error("Tool %s failed", tool, exc_info=True)
     if isinstance(exc, ssl.SSLError):
         return f"{type(exc).__name__}: operation failed."
+    if isinstance(exc, DeleteRefusedError):
+        # A gate refusal is authored text built from sanitized ids, and it
+        # names every blocker plus the next step: a Tier-1 with several kinds
+        # of dependents runs past 300 characters, and cutting it would cut the
+        # remedy. It still passes through ``sanitize``.
+        return sanitize(str(exc), _REFUSAL_MAX)
     _passthrough = (
         ValueError,
         FileNotFoundError,
@@ -91,6 +101,19 @@ def _safe_error(exc: Exception, tool: str) -> str:
     if isinstance(exc, _passthrough):
         return sanitize(str(exc), 300)
     return f"{type(exc).__name__}: operation failed."
+
+
+def _delete_error(exc: Exception, hint: str) -> dict:
+    """The error envelope for a gated delete; a refusal also carries what it measured.
+
+    A dict with ``error`` is what both audit sinks read as a failure, so a
+    refusal is audited as one without ``report_tool_failure``.
+    """
+    out: dict = {"error": _safe_error(exc, "nsx"), "hint": hint}
+    radius = getattr(exc, "blast_radius", None)
+    if isinstance(radius, dict):
+        out["blast_radius"] = radius
+    return out
 
 
 mcp = FastMCP(

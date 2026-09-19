@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from vmware_policy import report_tool_failure, vmware_tool
+from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _delete_error, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -114,46 +114,54 @@ def update_tier1_gateway(
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": True})
 @vmware_tool(risk_level="high")
-def delete_tier1_gateway(tier1_id: str, target: Optional[str] = None) -> str:
+def delete_tier1_gateway(tier1_id: str, confirm: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE] Delete a Tier-1 gateway; refuses while anything still depends on it.
 
-    Irreversible; confirm with the user first. Checks first (read-only) and
-    refuses, deleting nothing, while any remain: attached segments or
-    Tier-1-scoped segments, NAT rules, static routes, service interfaces,
-    extra locale-services, IPsec/L2 VPN services, a DNS forwarder, or a load
-    balancer service attached to it. It never removes them for you. When clear,
-    deletes the "default" locale-service, then the gateway. Returns a
-    confirmation string, or an "Error: ..." string naming the blocking ids —
-    not a dict.
+    Irreversible. Without confirm=True this only previews: it returns
+    blast_radius (name, tier0_path, the "default" locale-service and edge
+    cluster the delete removes, dependents by kind, blockers, unmeasured) and
+    deletes nothing. Show that to the user and get their decision. Do not set
+    confirm=True on your own because the user asked to delete earlier: they
+    have not seen the blast radius yet.
+
+    confirm=True re-measures (read-only) and refuses, deleting nothing, while
+    any remain: attached segments or Tier-1-scoped segments, NAT rules, static
+    routes, service interfaces, extra locale-services, IPsec/L2 VPN services, a
+    DNS forwarder, or a load balancer service attached to it — or when any of
+    them could not be read. It never removes them for you. When clear, deletes
+    the "default" locale-service, then the gateway. Returns {"action":
+    "preview" | "deleted", "blast_radius": ...}, else {"error", "hint",
+    "blast_radius"?}.
 
     Args:
         tier1_id: Gateway ID to delete, as returned by list_tier1_gateways.
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
         target: NSX Manager target from config (default if omitted).
     """
+    hint = (
+        f"Run list_tier1_gateways to confirm '{tier1_id}' exists on this target, "
+        "or 'vmware-nsx doctor' to check connectivity."
+    )
     try:
+        from vmware_nsx.ops.delete_gate import preview, refuse_unless_clear, tier1_delete_blast_radius
         from vmware_nsx.ops.segment_mgmt import delete_tier1_gateway as _delete
 
         client = server._get_connection(target)
+        radius = tier1_delete_blast_radius(client, tier1_id)
+        if confirm is not True:
+            return preview(radius)
+        refuse_unless_clear("delete_tier1_gateway", radius)
         out = _delete(client, tier1_id)
         if not (isinstance(out, dict) and out.get("deleted") is True):
-            # The pre-flight refused (or said nothing we can read as a delete).
-            # A string return is invisible to @vmware_tool, so declare it.
+            # The ops pre-flight refused (a dependent appeared since the
+            # measurement), or said nothing we can read as a delete.
             reason = out.get("error") if isinstance(out, dict) else None
             msg = reason or "the ops layer did not confirm the delete."
-            report_tool_failure(msg)
-            return f"Error: Tier-1 gateway '{tier1_id}' was NOT deleted. {msg}"
-        return f"Tier-1 gateway '{tier1_id}' deleted."
+            return {"error": f"Tier-1 gateway '{tier1_id}' was NOT deleted. {msg}",
+                    "hint": hint, "blast_radius": radius}
+        return {"action": "deleted", "deleted": tier1_id, "blast_radius": radius}
     except Exception as e:
-        msg = _safe_error(e, "nsx")
-        # This tool returns a string, so @vmware_tool sees an ordinary return
-        # and would audit the failed delete as status=ok while telling the
-        # circuit breaker the call succeeded. Declare the failure explicitly.
-        report_tool_failure(msg)
-        return (
-            f"Error: the gateway was NOT deleted. {msg} "
-            f"Run list_tier1_gateways to confirm '{tier1_id}' exists on this target, "
-            f"or 'vmware-nsx doctor' to check connectivity."
-        )
+        return _delete_error(e, hint)
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})

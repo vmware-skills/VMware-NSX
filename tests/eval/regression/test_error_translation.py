@@ -323,14 +323,14 @@ def test_delete_tools_route_errors_through_safe_error(tool_name, kwargs) -> None
     leaky = RuntimeError("https://secret-host:443/internal leaked body")
     with patch.object(srv, "_get_connection", side_effect=leaky):
         result = getattr(srv, tool_name)(**kwargs)
-    assert isinstance(result, str)
-    assert "secret-host" not in result, f"{tool_name} leaks raw exception text"
-    assert "operation failed" in result
+    assert isinstance(result, dict)
+    assert "secret-host" not in str(result), f"{tool_name} leaks raw exception text"
+    assert "operation failed" in result["error"]
 
     teaching = NsxApiError("HTTP 404. Run the list command.", status_code=404)
     with patch.object(srv, "_get_connection", side_effect=teaching):
         result = getattr(srv, tool_name)(**kwargs)
-    assert "404" in result, f"{tool_name} must surface NsxApiError teaching text"
+    assert "404" in result["error"], f"{tool_name} must surface NsxApiError teaching text"
 
 
 # ── SKILL.md ↔ FastMCP registry parity (踩坑 #34) ───────────────────────

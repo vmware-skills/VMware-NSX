@@ -33,7 +33,8 @@ All write operations pass through multiple safety layers:
 1. **`@vmware_tool` decorator** — mandatory on every MCP tool; provides pre-checks, audit logging, data sanitization, and timeout control
 2. **Double confirmation** — CLI destructive commands (segment delete, gateway delete, NAT rule delete) require two separate "Are you sure?" prompts
 3. **`--dry-run` mode** — all CLI write commands support preview without execution
-4. **Dependency checks** — segment deletion refuses while ports are attached; Tier-1 gateway deletion checks first and refuses, deleting nothing, while segments, NAT rules, static routes, service interfaces, extra locale-services, or VPN / DNS forwarder / load balancer services still depend on it
+3a. **MCP delete preview** — the five MCP delete tools (`delete_segment`, `delete_tier1_gateway`, `delete_nat_rule`, `delete_static_route`, `delete_ip_pool`) take `confirm: bool = False`. A call without `confirm=True` returns the blast radius and deletes nothing; `confirm=True` re-measures and is refused, deleting nothing, while a blocker remains or any read the blast radius depends on failed
+4. **Dependency checks** — segment deletion refuses while ports are attached; Tier-1 gateway deletion checks first and refuses, deleting nothing, while segments, NAT rules, static routes, service interfaces, extra locale-services, or VPN / DNS forwarder / load balancer services still depend on it; IP pool deletion over MCP refuses while addresses are allocated
 5. **Audit logging** — every operation (read and write) is logged to `~/.vmware/audit.db` (SQLite WAL) with timestamp, user, target, operation, parameters, and result
 6. **Policy engine** — `~/.vmware/rules.yaml` can deny operations by pattern, enforce maintenance windows, and set risk-level thresholds
 

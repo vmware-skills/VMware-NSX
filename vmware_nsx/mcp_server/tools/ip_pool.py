@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from vmware_policy import report_tool_failure, vmware_tool
+from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _delete_error, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -70,34 +70,41 @@ def create_ip_pool(
 @vmware_tool(risk_level="high")
 def delete_ip_pool(
     pool_id: str,
+    confirm: bool = False,
     target: Optional[str] = None,
-) -> str:
-    """[WRITE] Permanently delete an IP address pool.
+) -> dict:
+    """[WRITE] Permanently delete an IP address pool; refuses while IPs are allocated.
 
-    Irreversible: consumers such as transport endpoints can no longer allocate,
-    and NSX rejects the delete if the pool still has active allocations. Run
-    get_ip_pool_usage on the same pool_id first to confirm it is unused, and
-    confirm with the user before deleting. Returns a confirmation string, or an
-    "Error: ..." string — not a dict.
+    Irreversible: consumers such as transport endpoints can no longer allocate.
+    Without confirm=True this only previews: it returns blast_radius (the
+    pool's name, pool_usage, allocation_count, realized_allocation_count
+    and allocated_ips, blockers, unmeasured) and deletes nothing. Show that to the user and get their
+    decision. Do not set confirm=True on your own because the user asked to
+    delete earlier: they have not seen the blast radius yet. confirm=True
+    refuses while any IP is still allocated — in Policy ip-allocations or in
+    NSX's pool_usage count, which also covers TEP addresses — or when either
+    count could not be read. Returns {"action": "preview" |
+    "deleted", "blast_radius": ...}, else {"error", "hint", "blast_radius"?}.
 
     Args:
         pool_id: IP pool ID to delete, as returned by list_ip_pools.
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
         target: NSX Manager target from config (default if omitted).
     """
+    hint = (
+        f"Run list_ip_pools to confirm '{pool_id}' exists on this target, or "
+        "'vmware-nsx doctor' to check connectivity."
+    )
     try:
+        from vmware_nsx.ops.delete_gate import ip_pool_delete_blast_radius, preview, refuse_unless_clear
         from vmware_nsx.ops.nat_route_mgmt import delete_ip_pool as _delete
 
         client = server._get_connection(target)
+        radius = ip_pool_delete_blast_radius(client, pool_id)
+        if confirm is not True:
+            return preview(radius)
+        refuse_unless_clear("delete_ip_pool", radius)
         _delete(client, pool_id)
-        return f"IP pool '{pool_id}' deleted."
+        return {"action": "deleted", "deleted": pool_id, "blast_radius": radius}
     except Exception as e:
-        msg = _safe_error(e, "nsx")
-        # This tool returns a string, so @vmware_tool sees an ordinary return
-        # and would audit the failed delete as status=ok while telling the
-        # circuit breaker the call succeeded. Declare the failure explicitly.
-        report_tool_failure(msg)
-        return (
-            f"Error: the pool was NOT deleted. {msg} "
-            f"Run list_ip_pools to confirm '{pool_id}' exists on this target, or "
-            f"'vmware-nsx doctor' to check connectivity."
-        )
+        return _delete_error(e, hint)

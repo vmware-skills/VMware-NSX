@@ -34,6 +34,7 @@ These are structural, so it cannot.
 | Guardrail you would otherwise prompt for | Now enforced by |
 |---|---|
 | "Warn me if a segment still has workloads on it before deleting" | **`delete_segment` checks the ports first** and refuses, deleting nothing, while any is attached (it names them). The check runs server-side, not in the prompt. |
+| "Show me what a delete would remove before it happens" | **The five delete tools preview by default.** Without `confirm=True` they return `blast_radius` and delete nothing; `confirm=True` is refused while a blocker remains or a read failed. |
 | "Use explicit limits for queries that may return large amounts of data" | **The list envelope.** Every list-returning tool returns `{items, returned, limit, total, truncated, hint}`, so the model reads truncation instead of guessing at it. `truncated: true` means `items` is not the whole collection; `next_offset` (null on the last page) is what a paging loop stops on, and the `hint` says which of the two you are looking at. |
 | "If a listing came back empty, say so rather than claiming the call failed" | Same envelope. Empty `items` with `truncated: false` means the query genuinely matched nothing — a stated result, not a silence the model has to interpret. |
 | "Log every state change you make" | **The `@vmware_tool` decorator.** Every write is recorded to `~/.vmware/audit.db` before the model sees the result, and policy rules are evaluated ahead of execution. |
@@ -106,6 +107,9 @@ your agent's instruction block.
 - Before proposing delete_segment, call get_segment and report the connected
   port count. delete_segment refuses while ports are attached, so name what
   must be detached first rather than retrying.
+- Call a delete_* tool without confirm first and show the user its
+  blast_radius. Pass confirm=True only after the user has seen it and said
+  yes — an earlier "delete it" was said before they saw what it removes.
 - configure_tier0_bgp changes routing for everything behind that Tier-0. Treat
   it as estate-wide, not object-scoped, and say so.
 ```

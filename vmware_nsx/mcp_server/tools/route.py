@@ -2,10 +2,10 @@
 
 from typing import Literal, Optional
 
-from vmware_policy import report_tool_failure, vmware_tool
+from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _delete_error, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -70,39 +70,45 @@ def delete_static_route(
     tier1_id: str,
     route_id: str,
     gateway_type: Literal["tier0", "tier1"] = "tier1",
+    confirm: bool = False,
     target: Optional[str] = None,
-) -> str:
+) -> dict:
     """[WRITE] Permanently delete a static route from a Tier-0 or Tier-1 gateway.
 
     Irreversible: traffic to the route's destination CIDR immediately falls back
-    to remaining routes or is dropped. Run list_static_routes on the same
-    tier1_id first to confirm the route_id, destination and next hops, and
-    confirm with the user before deleting. gateway_type must match where the
-    route lives. Returns a confirmation string, or an "Error: ..." string — not
-    a dict.
+    to remaining routes or is dropped. Without confirm=True this only previews:
+    it returns blast_radius (the gateway, the route's network and next hops,
+    blockers, unmeasured) and deletes nothing. Show that to the user and get
+    their decision. Do not set confirm=True on your own because the user asked
+    to delete earlier: they have not seen the blast radius yet. gateway_type
+    must match where the route lives; a route_id not on that gateway is an
+    error, and confirm=True refuses when the routes could not be read. Returns
+    {"action": "preview" | "deleted", "blast_radius": ...}, else {"error",
+    "hint", "blast_radius"?}.
 
     Args:
         tier1_id: Gateway that owns the route (Tier-0 or Tier-1, per
             gateway_type), from list_tier0_gateways / list_tier1_gateways.
         route_id: Static route ID to delete, as returned by list_static_routes.
         gateway_type: Either "tier0" or "tier1" (default "tier1").
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
         target: NSX Manager target from config (default if omitted).
     """
+    hint = (
+        f"Run list_static_routes on '{tier1_id}' to confirm the route_id and that "
+        f"gateway_type='{gateway_type}' is right, or 'vmware-nsx doctor' to check "
+        "connectivity."
+    )
     try:
+        from vmware_nsx.ops.delete_gate import preview, refuse_unless_clear, static_route_delete_blast_radius
         from vmware_nsx.ops.nat_route_mgmt import delete_static_route as _delete
 
         client = server._get_connection(target)
+        radius = static_route_delete_blast_radius(client, tier1_id, route_id, gateway_type=gateway_type)
+        if confirm is not True:
+            return preview(radius)
+        refuse_unless_clear("delete_static_route", radius)
         _delete(client, tier1_id, route_id, gateway_type=gateway_type)
-        return f"Static route '{route_id}' deleted from '{tier1_id}'."
+        return {"action": "deleted", "deleted": route_id, "blast_radius": radius}
     except Exception as e:
-        msg = _safe_error(e, "nsx")
-        # This tool returns a string, so @vmware_tool sees an ordinary return
-        # and would audit the failed delete as status=ok while telling the
-        # circuit breaker the call succeeded. Declare the failure explicitly.
-        report_tool_failure(msg)
-        return (
-            f"Error: the route was NOT deleted. {msg} "
-            f"Run list_static_routes on '{tier1_id}' to confirm the route_id and that "
-            f"gateway_type='{gateway_type}' is right, or 'vmware-nsx doctor' to check "
-            f"connectivity."
-        )
+        return _delete_error(e, hint)

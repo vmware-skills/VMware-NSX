@@ -1,5 +1,12 @@
 """A delete that failed must be audited as a failure, not just *read* as one.
 
+Update 2026-09-19 (HLD §7 confirmation gate): the five deletes now return the
+family envelope — ``{"action": "preview" | "deleted", "blast_radius"}`` or
+``{"error", "hint"}`` — so ``@vmware_tool`` reads their failures without help
+and ``report_tool_failure`` is gone from them. The history below is why that
+matters, and the tests now pin the envelope and that no tool here returns a
+bare string again.
+
 ``@vmware_tool`` records a call as failed when an exception reaches it, or when
 the returned payload is a dict (or one-element list) carrying a truthy
 ``error`` key — the family's documented envelope. This skill's five delete
@@ -34,15 +41,21 @@ import pytest
 
 from vmware_nsx.connection import NsxApiError
 
-# The five tools whose failure path returns a string, with minimal arguments
-# and the ops function each one delegates to.
-STRING_RETURNING_DELETES = [
-    ("delete_segment", {"segment_id": "seg-x"}, "vmware_nsx.ops.segment_mgmt.delete_segment"),
-    ("delete_tier1_gateway", {"tier1_id": "t1-x"}, "vmware_nsx.ops.segment_mgmt.delete_tier1_gateway"),
-    ("delete_nat_rule", {"tier1_id": "t1-x", "rule_id": "r-x"}, "vmware_nsx.ops.nat_route_mgmt.delete_nat_rule"),
-    ("delete_static_route", {"tier1_id": "t1-x", "route_id": "r-x"}, "vmware_nsx.ops.nat_route_mgmt.delete_static_route"),
-    ("delete_ip_pool", {"pool_id": "pool-x"}, "vmware_nsx.ops.nat_route_mgmt.delete_ip_pool"),
+# The five deletes, with minimal arguments, the ops function each delegates to,
+# and the gate function that measures its blast radius first.
+DELETES = [
+    ("delete_segment", {"segment_id": "seg-x"}, "vmware_nsx.ops.segment_mgmt.delete_segment",
+     "segment_delete_blast_radius"),
+    ("delete_tier1_gateway", {"tier1_id": "t1-x"}, "vmware_nsx.ops.segment_mgmt.delete_tier1_gateway",
+     "tier1_delete_blast_radius"),
+    ("delete_nat_rule", {"tier1_id": "t1-x", "rule_id": "r-x"}, "vmware_nsx.ops.nat_route_mgmt.delete_nat_rule",
+     "nat_rule_delete_blast_radius"),
+    ("delete_static_route", {"tier1_id": "t1-x", "route_id": "r-x"},
+     "vmware_nsx.ops.nat_route_mgmt.delete_static_route", "static_route_delete_blast_radius"),
+    ("delete_ip_pool", {"pool_id": "pool-x"}, "vmware_nsx.ops.nat_route_mgmt.delete_ip_pool",
+     "ip_pool_delete_blast_radius"),
 ]
+_CLEAR = {"blockers": [], "unmeasured": []}
 
 
 @pytest.fixture
@@ -63,23 +76,20 @@ def _status(rows: list[dict]) -> str:
     return rows[0]["status"]
 
 
-@pytest.mark.parametrize(("tool_name", "kwargs", "ops_path"), STRING_RETURNING_DELETES)
-def test_failed_string_delete_is_audited_as_a_failure(audited, tool_name, kwargs, ops_path) -> None:
+@pytest.mark.parametrize(("tool_name", "kwargs", "ops_path", "_gate"), DELETES)
+def test_failed_delete_is_audited_as_a_failure(audited, tool_name, kwargs, ops_path, _gate) -> None:
     import vmware_nsx.mcp_server.server as srv
 
     failure = NsxApiError("NSX Manager returned HTTP 404.", status_code=404)
     with patch.object(srv, "_get_connection", side_effect=failure):
-        result = getattr(srv, tool_name)(**kwargs)
+        result = getattr(srv, tool_name)(**kwargs, confirm=True)
 
-    assert isinstance(result, str) and result.startswith("Error:")
-    assert _status(audited) == "error", (
-        f"{tool_name} caught the failure and returned a string, so @vmware_tool "
-        "saw an ordinary return — it must call report_tool_failure()"
-    )
+    assert "404" in result["error"]
+    assert _status(audited) == "error"
 
 
-@pytest.mark.parametrize(("tool_name", "kwargs", "ops_path"), STRING_RETURNING_DELETES)
-def test_successful_string_delete_is_still_audited_ok(audited, tool_name, kwargs, ops_path) -> None:
+@pytest.mark.parametrize(("tool_name", "kwargs", "ops_path", "gate"), DELETES)
+def test_successful_delete_is_still_audited_ok(audited, tool_name, kwargs, ops_path, gate) -> None:
     """The other direction: the signal must not mark good calls failed.
 
     A guard that reported every call as a failure would pass the test above and
@@ -87,38 +97,38 @@ def test_successful_string_delete_is_still_audited_ok(audited, tool_name, kwargs
     """
     import vmware_nsx.mcp_server.server as srv
 
-    # Every ops delete returns {"deleted": True, ...} on success, and the Tier-1
-    # wrapper only reports a delete the ops layer confirmed (a pre-flight may
-    # refuse), so a bare MagicMock return is not a success there.
     with patch.object(srv, "_get_connection", return_value=object()), patch(
-        ops_path, return_value={"deleted": True}
-    ):
-        result = getattr(srv, tool_name)(**kwargs)
+        f"vmware_nsx.ops.delete_gate.{gate}", return_value=dict(_CLEAR)
+    ), patch(ops_path, return_value={"deleted": True}) as ops:
+        result = getattr(srv, tool_name)(**kwargs, confirm=True)
 
-    assert "deleted" in result and not result.startswith("Error:")
+    ops.assert_called_once()
+    assert result["action"] == "deleted" and "error" not in result
     assert _status(audited) == "ok"
 
 
-def test_the_covered_list_matches_the_string_returning_tools() -> None:
-    """The parametrised list must not drift from the code it guards.
+def test_no_tool_returns_a_bare_string() -> None:
+    """A ``-> str`` tool's failure is invisible to ``@vmware_tool``.
 
-    A new ``-> str`` tool added without a ``report_tool_failure`` call would
-    reintroduce the defect silently, and a fixed list only guards the names
-    someone remembered to add.
+    It would be audited ``ok`` and reported to the circuit breaker as a
+    success. The five deletes were the only ones and now return the envelope;
+    a new string-returning tool would reintroduce the defect silently.
     """
     import vmware_nsx.mcp_server.server as srv
 
+    checked = 0
     string_returning = set()
     for name in dir(srv):
         fn = getattr(srv, name)
         if not getattr(fn, "_is_vmware_tool", False):
             continue
+        checked += 1
         hints = typing.get_type_hints(getattr(fn, "__wrapped__", fn))
         if hints.get("return") is str:
             string_returning.add(name)
 
-    assert string_returning, "no string-returning tools found — the scan is vacuous"
-    assert string_returning == {name for name, _, _ in STRING_RETURNING_DELETES}, (
-        f"string-returning tools changed: {sorted(string_returning)}. Every one of "
-        "them needs a report_tool_failure() call in its except block, and a row here."
+    assert checked >= 30, f"only {checked} tools scanned — the scan is vacuous"
+    assert not string_returning, (
+        f"these tools return a bare string: {sorted(string_returning)}. @vmware_tool "
+        "cannot see a failure in a string: return the {'error', 'hint'} envelope."
     )

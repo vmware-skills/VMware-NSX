@@ -83,14 +83,14 @@ def _subject(signature: inspect.Signature, params: dict[str, Any]) -> str:
 def _failed(result: Any) -> bool:
     """Whether a returned value says the write did not happen.
 
-    Two shapes, both documented by the tools that produce them. The dict-shaped
-    writes return the family envelope ``{"error", "hint"}`` — the same key
-    ``vmware_policy`` reads. The five deletes return a sentence, because a delete
-    has nothing else to return, and their docstrings state the contract: a
-    confirmation, or one beginning "Error:". ``@vmware_tool`` refuses to sniff
-    strings for a good reason — a skill whose output *is* console text could emit
-    "Error:" as data — but nothing this surface returns is console text, and the
-    alternative is filing a delete that did not happen as ``ok``.
+    The writes return the family envelope ``{"error", "hint"}`` — the same key
+    ``vmware_policy`` reads. Until the confirmation gate (HLD §7) the five
+    deletes returned a sentence, a confirmation or one beginning "Error:"; they
+    return the envelope now, and the string branch stays for any write that
+    still answers in a sentence. ``@vmware_tool`` refuses to sniff strings for a
+    good reason — a skill whose output *is* console text could emit "Error:" as
+    data — but nothing this surface returns is console text, and the
+    alternative is filing a write that did not happen as ``ok``.
     """
     if isinstance(result, dict):
         return bool(result.get("error"))
@@ -99,6 +99,21 @@ def _failed(result: Any) -> bool:
     if isinstance(result, str):
         return result.startswith("Error:")
     return False
+
+
+def _outcome(result: Any) -> str:
+    """``error``, ``preview`` or ``ok`` for one returned value.
+
+    A gated delete called without ``confirm=True`` returns ``{"action":
+    "preview"}`` and changes nothing. Filed as ``ok`` it reads as a deletion
+    in a log whose rows are meant to be true, so it is filed the way the CLI
+    files its ``--dry-run`` (``dry-run``): as what it was.
+    """
+    if _failed(result):
+        return "error"
+    if isinstance(result, dict) and result.get("action") == "preview":
+        return "preview"
+    return "ok"
 
 
 def _record(tool: str, signature: inspect.Signature, params: dict[str, Any], result: str) -> None:
@@ -138,7 +153,7 @@ def _audited(fn: Callable) -> Callable:
         except Exception:
             _record(fn.__name__, signature, params, "error")
             raise
-        _record(fn.__name__, signature, params, "error" if _failed(result) else "ok")
+        _record(fn.__name__, signature, params, _outcome(result))
         return result
 
     return wrapper

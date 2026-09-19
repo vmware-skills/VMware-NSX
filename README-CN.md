@@ -316,7 +316,8 @@ vmware-nsx-mcp
 | 只读为主 | 33 个工具中 20 个只读 |
 | 双重确认 | CLI 写操作需两次确认 |
 | --dry-run | 所有写操作支持预览模式 |
-| 依赖检查 | 删除 segment 时若仍有端口连接则拒绝；删除 Tier-1 时若仍有 segment、NAT 规则、静态路由、接口或 VPN / DNS 转发器 / 负载均衡服务依赖它则拒绝，且不做任何改动（`--dry-run` 执行同样的检查）。其他删除操作不做预检 |
+| MCP 删除预览 | 五个 MCP 删除工具默认只预览：不传 `confirm=True` 时返回 `blast_radius`（将删除什么、`blockers`、`unmeasured`），不删除任何东西。仍有阻塞项或有读取失败时，`confirm=True` 会被拒绝 |
+| 依赖检查 | 删除 segment 时若仍有端口连接则拒绝；删除 Tier-1 时若仍有 segment、NAT 规则、静态路由、接口或 VPN / DNS 转发器 / 负载均衡服务依赖它则拒绝，且不做任何改动（`--dry-run` 执行同样的检查）。通过 MCP 删除 IP 池时，若仍有已分配地址则拒绝——包括 Policy ip-allocations，以及 NSX `pool_usage` 的计数（它也涵盖 Policy 不列出的地址，如 TEP 池）；`pool_usage` 无法读取时同样拒绝。NAT 规则与静态路由的删除没有阻塞项；其预览显示规则的匹配条件，或路由的目标网段与下一跳 |
 | 输入验证 | CIDR、IP、VLAN ID、网关存在性验证 |
 | 审计日志 | 所有操作记录到 `~/.vmware-nsx/audit.log`（JSON Lines） |
 | 无防火墙操作 | 无法创建/修改 DFW 规则或安全组 |

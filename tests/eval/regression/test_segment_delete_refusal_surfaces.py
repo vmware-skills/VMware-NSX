@@ -131,11 +131,11 @@ def test_mcp_refusal_is_returned_not_reported_as_deleted(policy_rows, skill_log)
 
     client = FakeNsx(ports=_BUSY)
     with patch.object(srv, "_get_connection", return_value=client):
-        out = srv.delete_segment(SEG)
+        out = srv.delete_segment(SEG, confirm=True)
 
-    assert out.startswith("Error:"), out
-    assert "NOT deleted" in out
-    assert "vm-a-vnic0" in out and "vm-b-vnic0" in out, "the refusal must name the attached ports"
+    assert "Nothing was deleted" in out["error"], out
+    assert "vm-a-vnic0" in out["error"] and "vm-b-vnic0" in out["error"], "the refusal must name the attached ports"
+    assert out["blast_radius"]["port_count"] == 2
     assert client.deleted == []
     assert [r["status"] for r in policy_rows] == ["error"], "vmware-policy audited the refusal as a success"
     assert [r["result"] for r in skill_log()] == ["error"]
@@ -146,9 +146,9 @@ def test_mcp_clean_delete_is_still_ok(policy_rows, skill_log):
 
     client = FakeNsx()
     with patch.object(srv, "_get_connection", return_value=client):
-        out = srv.delete_segment(SEG)
+        out = srv.delete_segment(SEG, confirm=True)
 
-    assert out == f"Segment '{SEG}' deleted."
+    assert out["action"] == "deleted" and out["deleted"] == SEG
     assert client.deleted == [SEG_PATH]
     assert [r["status"] for r in policy_rows] == ["ok"]
     assert [r["result"] for r in skill_log()] == ["ok"]
@@ -160,8 +160,8 @@ def test_mcp_only_claims_deleted_when_ops_says_so(policy_rows):
     with patch.object(srv, "_get_connection", return_value=FakeNsx()), patch(
         "vmware_nsx.ops.segment_mgmt.delete_segment", return_value={"segment_id": SEG}
     ):
-        out = srv.delete_segment(SEG)
-    assert out.startswith("Error:")
+        out = srv.delete_segment(SEG, confirm=True)
+    assert "NOT deleted" in out["error"]
     assert [r["status"] for r in policy_rows] == ["error"]
 
 

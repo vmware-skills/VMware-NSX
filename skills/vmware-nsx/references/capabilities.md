@@ -10,13 +10,14 @@ Each operation is classified by autonomy level per the Enterprise Harness Engine
 |:-:|---|---|---|
 | **L1** | Read-only, raw data | Always auto-run | `list_segments`, `get_segment`, `list_tier0_gateways`, `list_tier1_gateways`, `list_nat_rules`, `list_ip_pools`, `list_static_routes`, alarms/health queries |
 | **L2** | Read + analysis / recommendation | Always auto-run | `get_bgp_neighbors`, `get_segment_port_for_vm`, `get_ip_pool_usage`, `get_logical_port_status` — correlation and utilization summaries over raw data |
-| **L3** | Single write — user must approve | Only when the user explicitly asked for that change; CLI adds double-confirm + optional `--dry-run`; segment delete refuses while ports are attached; Tier-1 delete refuses while anything still depends on the gateway | `create_segment`, `delete_segment`, `create_nat_rule`, `update_tier1_gateway`, `create_ip_pool`, `configure_tier0_bgp`, static route mutations |
+| **L3** | Single write — user must approve | Only when the user explicitly asked for that change; CLI adds double-confirm + optional `--dry-run`; the five MCP deletes preview by default and act only with `confirm=True`; segment delete refuses while ports are attached; Tier-1 delete refuses while anything still depends on the gateway; IP pool delete refuses while addresses are allocated | `create_segment`, `delete_segment`, `create_nat_rule`, `update_tier1_gateway`, `create_ip_pool`, `configure_tier0_bgp`, static route mutations |
 | **L4** | Multi-step plan / apply workflow | Plan generation auto; apply gated by user approval | *(roadmap — multi-segment rollout plans, gateway HA failover sequences)* |
 | **L5** | Auto-remediation from learned pattern | Pattern library only; requires `risk:low` + `reversible:true` + `repeatable:true` | *(roadmap — candidates: stale segment cleanup, transport-node refresh)* |
 
 **Notes**:
 - L1/L2 tools are always safe for agents to call without confirmation.
-- L3 tools always pass through the `@vmware_tool` decorator: policy check (`~/.vmware/rules.yaml` deny rules, per environment) → execute → audit log. MCP write tools have no confirmation step of their own — getting the user's explicit approval is the agent's job; the CLI's double-confirm and `--dry-run` do not apply to MCP calls. Segment delete additionally verifies port count = 0; Tier-1 delete runs the dependency pre-check below and refuses, deleting nothing, while any dependent remains.
+- L3 tools always pass through the `@vmware_tool` decorator: policy check (`~/.vmware/rules.yaml` deny rules, per environment) → execute → audit log. The CLI's double-confirm and `--dry-run` do not apply to MCP calls.
+- **MCP deletes preview by default** (`delete_segment`, `delete_tier1_gateway`, `delete_nat_rule`, `delete_static_route`, `delete_ip_pool`). A call without `confirm=True` reads what the delete would remove and returns `{"action": "preview", "blast_radius": {...}}`, deleting nothing. `blast_radius` names the object and what it measured — a segment's gateway, subnets, `port_count`/`port_ids`; a Tier-1's `tier0_path`, the `default` locale-service and edge cluster it removes, and its `dependents` by kind; a NAT rule's gateway, action, match and translation; a route's gateway, network and next hops; a pool's `pool_usage`, `allocation_count` (Policy ip-allocations), `realized_allocation_count` (NSX's `pool_usage.allocated_ip_allocations`, which also counts addresses Policy does not list, e.g. TEP pools) and `allocated_ips` — plus `blockers` and `unmeasured`. `confirm=True` re-measures and is refused, deleting nothing, while a blocker remains (attached ports, any Tier-1 dependent, allocated IPs) or while any of those reads failed (`unmeasured` non-empty); the refusal is `{"error", "hint", "blast_radius"}`. Show the preview to the user; set `confirm=True` only after they decide — not because they asked for the delete before seeing it. The preview is logged to the skill audit log as `preview`, not `ok`.
 - For DFW/security rules see [vmware-nsx-security](https://github.com/vmware-skills/VMware-NSX-Security).
 
 ## API Coverage
@@ -53,7 +54,7 @@ Classification follows each tool's `[READ]`/`[WRITE]` docstring marker; see READ
 | Get segment details (includes its ports) | `get_segment` | `/policy/api/v1/infra/segments/{id}` + `/ports` | GET |
 | Create segment | `create_segment` | `/policy/api/v1/infra/segments/{id}` | PUT |
 | Update segment | `update_segment` | `/policy/api/v1/infra/segments/{id}` | PATCH |
-| Delete segment | `delete_segment` | Pre-check (GET): `/policy/api/v1/infra/segments/{id}/ports` — refuses, listing port ids, while any is attached. Then `/policy/api/v1/infra/segments/{id}` | GET, DELETE |
+| Delete segment | `delete_segment` | Pre-check (GET): `/policy/api/v1/infra/segments/{id}` (identity, gateway, subnets) and `/policy/api/v1/infra/segments/{id}/ports` — refuses, listing port ids, while any is attached. Then `/policy/api/v1/infra/segments/{id}` | GET, DELETE |
 
 **Note**: there is no standalone segment-port listing tool. Ports are returned by
 `get_segment` (attached ports + total count) and, with realized state, by
@@ -93,7 +94,7 @@ static routes and `get_bgp_neighbors` for learned-route peering state.
 | Get Tier-1 details | `get_tier1_gateway` | `/policy/api/v1/infra/tier-1s/{id}` | GET |
 | Create Tier-1 | `create_tier1_gateway` | `/policy/api/v1/infra/tier-1s/{id}`, plus `.../locale-services/default` when an edge cluster is given | PUT |
 | Update Tier-1 | `update_tier1_gateway` | `/policy/api/v1/infra/tier-1s/{id}` | PATCH |
-| Delete Tier-1 | `delete_tier1_gateway` | Pre-check (GET) — refuses, listing ids, if any remain: `/policy/api/v1/infra/segments` and `/policy/api/v1/infra/lb-services` (by `connectivity_path`); under `.../tier-1s/{id}/`: `segments`, `nat/USER/nat-rules`, `static-routes`, `locale-services` (any but `default`), `locale-services/default/interfaces`, `ipsec-vpn-services`, `l2vpn-services`, `dns-forwarder`. A 404 means none; any other read error aborts without deleting. Then `.../locale-services/default` (best effort), then `/policy/api/v1/infra/tier-1s/{id}` | GET, DELETE |
+| Delete Tier-1 | `delete_tier1_gateway` | Pre-check (GET) of `/policy/api/v1/infra/tier-1s/{id}` (identity) — refuses, listing ids, if any remain: `/policy/api/v1/infra/segments` and `/policy/api/v1/infra/lb-services` (by `connectivity_path`); under `.../tier-1s/{id}/`: `segments`, `nat/USER/nat-rules`, `static-routes`, `locale-services` (any but `default`), `locale-services/default/interfaces`, `ipsec-vpn-services`, `l2vpn-services`, `dns-forwarder`. A 404 means none; any other read error aborts without deleting. Then `.../locale-services/default` (best effort), then `/policy/api/v1/infra/tier-1s/{id}` | GET, DELETE |
 
 **Route advertisement types**:
 - `TIER1_CONNECTED` — Connected subnets
@@ -110,7 +111,7 @@ static routes and `get_bgp_neighbors` for learned-route peering state.
 |------------|------|-------------|--------|
 | List NAT rules | `list_nat_rules` | `/policy/api/v1/infra/tier-1s/{id}/nat/USER/nat-rules` | GET |
 | Create NAT rule | `create_nat_rule` | `/policy/api/v1/infra/tier-1s/{id}/nat/USER/nat-rules/{rule}` | PUT |
-| Delete NAT rule | `delete_nat_rule` | `/policy/api/v1/infra/tier-1s/{id}/nat/USER/nat-rules/{rule}` | DELETE |
+| Delete NAT rule | `delete_nat_rule` | Blast radius (GET): walks `/policy/api/v1/infra/tier-1s/{id}/nat/USER/nat-rules` for the rule. Then `/policy/api/v1/infra/tier-1s/{id}/nat/USER/nat-rules/{rule}` | GET, DELETE |
 
 **No get/update NAT tool**: read a single rule by listing the gateway's rules and filtering
 client-side; change a rule by re-issuing `create_nat_rule` with the same `rule_id` (the
@@ -133,7 +134,7 @@ this skill.
 |------------|------|-------------|--------|
 | List static routes | `list_static_routes` | `/policy/api/v1/infra/tier-{0,1}s/{id}/static-routes` | GET |
 | Create static route | `create_static_route` | `/policy/api/v1/infra/tier-{0,1}s/{id}/static-routes/{route}` | PUT |
-| Delete static route | `delete_static_route` | `/policy/api/v1/infra/tier-{0,1}s/{id}/static-routes/{route}` | DELETE |
+| Delete static route | `delete_static_route` | Blast radius (GET): walks `/policy/api/v1/infra/tier-{0,1}s/{id}/static-routes` for the route. Then `/policy/api/v1/infra/tier-{0,1}s/{id}/static-routes/{route}` | GET, DELETE |
 
 Unlike NAT, these three do select `tier-0s` or `tier-1s` from the gateway type argument.
 
@@ -144,7 +145,7 @@ Unlike NAT, these three do select `tier-0s` or `tier-1s` from the gateway type a
 | List pools | `list_ip_pools` | `/policy/api/v1/infra/ip-pools` | GET |
 | Get allocations for one pool | `get_ip_pool_usage` | `/policy/api/v1/infra/ip-pools/{id}/ip-allocations` | GET |
 | Create pool (with one static subnet) | `create_ip_pool` | `/policy/api/v1/infra/ip-pools/{id}`, then `.../ip-subnets/{subnet}` | PUT |
-| Delete pool | `delete_ip_pool` | `/policy/api/v1/infra/ip-pools/{id}` | DELETE |
+| Delete pool | `delete_ip_pool` | Blast radius (GET): walks `/policy/api/v1/infra/ip-pools` for the pool, then `/policy/api/v1/infra/ip-pools/{id}/ip-allocations` — refuses, listing addresses, while any is allocated; also refuses while the pool's `pool_usage.allocated_ip_allocations` is above zero or unreadable. Then `/policy/api/v1/infra/ip-pools/{id}` | GET, DELETE |
 
 **Note**: subnet creation is not a separate tool — `create_ip_pool` writes the pool and its
 one static subnet + allocation range in a single call. It is two PUTs, not atomic: if the

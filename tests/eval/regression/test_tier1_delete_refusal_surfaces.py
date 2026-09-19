@@ -7,10 +7,9 @@ gateway. Both wrappers threw that answer away: the MCP tool returned
 and wrote ``result="ok"`` to the skill audit log. The refusal was correct and
 nobody could see it; an operator would believe the gateway was gone.
 
-The MCP tool keeps its documented string contract (all five deletes on this
-surface return a sentence), so the refusal becomes an ``Error:`` sentence that
-names the blocking ids, and ``report_tool_failure`` tells ``@vmware_tool`` the
-call failed. Asserted on both audit sinks, because the returned text was never
+The MCP tool now returns the family envelope (HLD §7 confirmation gate,
+2026-09-19): the refusal is an ``error`` that names the blocking ids, which
+both audit sinks read as a failure. Asserted on both audit sinks, because the returned text was never
 the only thing that lied.
 
 ``--dry-run`` had the same gap one step earlier: it previewed a DELETE that the
@@ -77,11 +76,10 @@ def test_mcp_refusal_is_returned_not_reported_as_deleted(policy_rows, skill_log)
 
     client = f.FakeNsx(collections=_BLOCKED)
     with patch.object(srv, "_get_connection", return_value=client):
-        out = srv.delete_tier1_gateway(f.T1)
+        out = srv.delete_tier1_gateway(f.T1, confirm=True)
 
-    assert out.startswith("Error:"), out
-    assert "NOT deleted" in out
-    assert "web-seg" in out and "vpn-1" in out, "the refusal must name what blocks"
+    assert "Nothing was deleted" in out["error"], out
+    assert "web-seg" in out["error"] and "vpn-1" in out["error"], "the refusal must name what blocks"
     assert client.deleted == []
     assert [r["status"] for r in policy_rows] == ["error"], "vmware-policy audited the refusal as a success"
     assert [r["result"] for r in skill_log() if r["operation"] == "delete_tier1_gateway"] == ["error"]
@@ -92,9 +90,9 @@ def test_mcp_clean_delete_is_still_ok(policy_rows, skill_log):
 
     client = f.FakeNsx()
     with patch.object(srv, "_get_connection", return_value=client):
-        out = srv.delete_tier1_gateway(f.T1)
+        out = srv.delete_tier1_gateway(f.T1, confirm=True)
 
-    assert out == f"Tier-1 gateway '{f.T1}' deleted."
+    assert out["action"] == "deleted" and out["deleted"] == f.T1
     assert client.deleted[-1] == f.BASE
     assert [r["status"] for r in policy_rows] == ["ok"]
     assert [r["result"] for r in skill_log() if r["operation"] == "delete_tier1_gateway"] == ["ok"]
@@ -107,8 +105,8 @@ def test_mcp_only_claims_deleted_when_ops_says_so(policy_rows):
     with patch.object(srv, "_get_connection", return_value=f.FakeNsx()), patch(
         "vmware_nsx.ops.segment_mgmt.delete_tier1_gateway", return_value={"tier1_id": f.T1}
     ):
-        out = srv.delete_tier1_gateway(f.T1)
-    assert out.startswith("Error:")
+        out = srv.delete_tier1_gateway(f.T1, confirm=True)
+    assert "NOT deleted" in out["error"]
     assert [r["status"] for r in policy_rows] == ["error"]
 
 

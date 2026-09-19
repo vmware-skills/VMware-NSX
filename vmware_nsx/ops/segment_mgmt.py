@@ -172,6 +172,18 @@ def segment_delete_blockers(client: NsxClient, segment_id: str) -> dict:
     }
 
 
+def segment_refusal_message(blockers: dict) -> str:
+    """Teaching text for a segment delete refused by attached ports."""
+    ids = blockers["port_ids"]
+    more = ", …" if blockers["port_count"] > len(ids) else ""
+    return (
+        f"Segment has {blockers['port_count']} active port(s) "
+        f"[{', '.join(ids)}{more}]. Nothing was deleted. Detach all ports "
+        "first (get_segment lists them, get_logical_port_status shows "
+        "their state), then retry."
+    )
+
+
 def delete_segment(client: NsxClient, segment_id: str) -> dict:
     """Delete a segment after verifying no ports are attached.
 
@@ -189,17 +201,10 @@ def delete_segment(client: NsxClient, segment_id: str) -> dict:
 
     blockers = segment_delete_blockers(client, segment_id)
     if blockers:
-        ids = blockers["port_ids"]
-        more = ", …" if blockers["port_count"] > len(ids) else ""
         return {
             "deleted": False,
             "segment_id": segment_id,
-            "error": (
-                f"Segment has {blockers['port_count']} active port(s) "
-                f"[{', '.join(ids)}{more}]. Nothing was deleted. Detach all ports "
-                "first (get_segment lists them, get_logical_port_status shows "
-                "their state), then retry."
-            ),
+            "error": segment_refusal_message(blockers),
             **blockers,
         }
 

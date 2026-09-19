@@ -14,19 +14,19 @@ Complete setup and security guide for `vmware-nsx`.
 ### Via uv (recommended)
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.9.1
+uv tool install vmware-nsx-mgmt==1.10.0
 ```
 
 ### Via pip
 
 ```bash
-pip install vmware-nsx-mgmt==1.9.1
+pip install vmware-nsx-mgmt==1.10.0
 ```
 
 ### From source
 
 ```bash
-git clone --branch v1.9.1 https://github.com/vmware-skills/VMware-NSX.git
+git clone --branch v1.10.0 https://github.com/vmware-skills/VMware-NSX.git
 cd VMware-NSX
 pip install -e .
 ```
@@ -294,7 +294,7 @@ CLI write commands require two separate confirmation prompts before executing:
 1. First prompt: "Confirm #1: <action> '<resource>'?" (default: No)
 2. Second prompt: "Confirm #2: This is irreversible. <action> '<resource>'?" (default: No)
 
-Both must be answered `y` for the operation to proceed. This applies to all CLI create, update, and delete commands. MCP write tools have no confirmation step of their own: they execute when called (and are audit-logged), so the agent must call them only after the user has explicitly asked for that change. Use `~/.vmware/rules.yaml` deny rules to block writes on environments such as `production`.
+Both must be answered `y` for the operation to proceed. This applies to all CLI create, update, and delete commands. The five MCP delete tools preview by default: without `confirm=True` they return the blast radius and delete nothing, and `confirm=True` is refused while a blocker remains or a read failed. Other MCP write tools execute when called (and are audit-logged), so the agent must call them only after the user has explicitly asked for that change. Use `~/.vmware/rules.yaml` deny rules to block writes on environments such as `production`.
 
 ### Dry-Run Mode
 

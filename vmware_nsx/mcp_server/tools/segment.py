@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from vmware_policy import report_tool_failure, vmware_tool
+from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _delete_error, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -104,41 +104,47 @@ def update_segment(
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": True})
 @vmware_tool(risk_level="high")
-def delete_segment(segment_id: str, target: Optional[str] = None) -> str:
+def delete_segment(segment_id: str, confirm: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE] Delete a network segment; refuses while any port is attached.
 
-    Irreversible; confirm with the user first. Checks the segment's ports first
-    and refuses, deleting nothing, while any port (a VM vNIC or router
-    interface) is attached — it never disconnects them for you. get_segment
-    shows port_count. Returns a confirmation string, or an "Error: ..." string
-    naming the attached port ids — not a dict.
+    Irreversible. Without confirm=True this only previews: it returns
+    blast_radius (the segment's name, gateway, subnets, port_count and
+    port_ids, blockers, unmeasured) and deletes nothing. Show that to the user
+    and get their decision. Do not set confirm=True on your own because the
+    user asked to delete earlier: they have not seen the blast radius yet.
+
+    confirm=True re-measures, then refuses, deleting nothing, while any port
+    (a VM vNIC or router interface) is attached — it never disconnects them for
+    you — or when the ports could not be read. Returns {"action": "preview" |
+    "deleted", "blast_radius": ...}, else {"error", "hint", "blast_radius"?}.
 
     Args:
         segment_id: Segment ID to delete, as returned by list_segments.
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
         target: NSX Manager target from config (default if omitted).
     """
+    hint = (
+        f"Run list_segments to confirm '{segment_id}' exists on this target, or "
+        "get_logical_port_status to see whether ports are still attached "
+        "(a segment with attached ports cannot be deleted)."
+    )
     try:
+        from vmware_nsx.ops.delete_gate import preview, refuse_unless_clear, segment_delete_blast_radius
         from vmware_nsx.ops.segment_mgmt import delete_segment as _delete
 
         client = server._get_connection(target)
+        radius = segment_delete_blast_radius(client, segment_id)
+        if confirm is not True:
+            return preview(radius)
+        refuse_unless_clear("delete_segment", radius)
         out = _delete(client, segment_id)
         if not (isinstance(out, dict) and out.get("deleted") is True):
-            # The port check refused (or said nothing we can read as a delete).
-            # A string return is invisible to @vmware_tool, so declare it.
+            # The ops port check refused (a port attached since the measurement),
+            # or said nothing we can read as a delete.
             reason = out.get("error") if isinstance(out, dict) else None
             msg = reason or "the ops layer did not confirm the delete."
-            report_tool_failure(msg)
-            return f"Error: Segment '{segment_id}' was NOT deleted. {msg}"
-        return f"Segment '{segment_id}' deleted."
+            return {"error": f"Segment '{segment_id}' was NOT deleted. {msg}",
+                    "hint": hint, "blast_radius": radius}
+        return {"action": "deleted", "deleted": segment_id, "blast_radius": radius}
     except Exception as e:
-        msg = _safe_error(e, "nsx")
-        # This tool returns a string, so @vmware_tool sees an ordinary return
-        # and would audit the failed delete as status=ok while telling the
-        # circuit breaker the call succeeded. Declare the failure explicitly.
-        report_tool_failure(msg)
-        return (
-            f"Error: the segment was NOT deleted. {msg} "
-            f"Run list_segments to confirm '{segment_id}' exists on this target, or "
-            f"get_logical_port_status to see whether ports are still attached "
-            f"(a segment with attached ports cannot be deleted)."
-        )
+        return _delete_error(e, hint)

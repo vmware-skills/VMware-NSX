@@ -258,7 +258,8 @@ More agent config templates (Claude Code, Cursor, Goose, Continue, etc.) in [exa
 | Read-heavy | 20/33 tools are read-only |
 | Double confirmation | CLI write commands require two prompts |
 | Dry-run mode | All write commands support `--dry-run` preview |
-| Dependency checks | Segment delete refuses while ports are attached; Tier-1 delete refuses, deleting nothing, while segments, NAT rules, static routes, interfaces or VPN / DNS forwarder / LB services still depend on it (`--dry-run` runs the same check). Other deletes are not pre-checked |
+| MCP delete preview | The five MCP delete tools preview by default: without `confirm=True` they return `blast_radius` (what would be removed, `blockers`, `unmeasured`) and delete nothing. `confirm=True` is refused while a blocker remains or a read failed |
+| Dependency checks | Segment delete refuses while ports are attached; Tier-1 delete refuses, deleting nothing, while segments, NAT rules, static routes, interfaces or VPN / DNS forwarder / LB services still depend on it (`--dry-run` runs the same check). On MCP, IP pool delete refuses while addresses are allocated — Policy ip-allocations, or NSX's `pool_usage` count, which also covers addresses Policy does not list (e.g. TEP pools) — and when `pool_usage` cannot be read. NAT rule and static route deletes have no blockers; their preview shows the rule's match or the route's network and next hops |
 | Input validation | CIDR, IP, VLAN IDs, gateway existence validated |
 | Audit logging | All operations logged to `~/.vmware-nsx/audit.log` |
 | No firewall ops | Cannot create/modify DFW rules or security groups |

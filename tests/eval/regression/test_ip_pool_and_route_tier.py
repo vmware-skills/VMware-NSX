@@ -101,13 +101,17 @@ def test_mcp_delete_ip_pool_calls_ops() -> None:
     with (
         patch.object(srv, "_get_connection", return_value=client),
         patch(
+            "vmware_nsx.ops.delete_gate.ip_pool_delete_blast_radius",
+            return_value={"pool_id": "pool-1", "blockers": [], "unmeasured": []},
+        ),
+        patch(
             "vmware_nsx.ops.nat_route_mgmt.delete_ip_pool",
             return_value={"deleted": True, "pool_id": "pool-1"},
         ) as mock_delete,
     ):
-        result = srv.delete_ip_pool("pool-1")
+        result = srv.delete_ip_pool("pool-1", confirm=True)
     mock_delete.assert_called_once()
-    assert "pool-1" in result
+    assert result["deleted"] == "pool-1"
 
 
 # ── #10: static-route MCP wrappers thread gateway_type ───────────────────

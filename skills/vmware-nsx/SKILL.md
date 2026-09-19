@@ -15,7 +15,7 @@ metadata: {"openclaw":{"requires":{"anyBins":["vmware-nsx","uvx"]},"optional":{"
 compatibility: >
   vmware-policy auto-installed as Python dependency (provides @vmware_tool decorator and audit logging). All write operations audited to ~/.vmware/audit.db.
   Credentials: Each NSX Manager target requires a per-target password env var in ~/.vmware-nsx/.env following the pattern VMWARE_NSX_<TARGET_NAME_UPPER>_PASSWORD. Username/password session auth only (client-certificate auth is not implemented). Passwords are never logged or echoed.
-  Write operations: CLI write commands require double confirmation and support --dry-run. MCP write tools have no built-in confirmation step — they execute when called and are audit-logged, so the agent must call them only on the user's explicit request; ~/.vmware/rules.yaml deny rules can block them per environment. Segment delete refuses while ports are attached.
+  Write operations: CLI write commands require double confirmation and support --dry-run. The five MCP delete tools preview by default — without confirm=True they return the blast radius and change nothing, and confirm=True is refused while a blocker remains (attached ports, Tier-1 dependents, allocated IPs) or a read failed. Other MCP write tools execute when called and are audit-logged, so the agent must call them only on the user's explicit request; ~/.vmware/rules.yaml deny rules can block them per environment.
   VMWARE_AUDIT_APPROVED_BY is an optional attestation recorded in the audit row; it is not a gate and does not carry credentials.
   No webhooks, no outbound network calls, no guest operations. Local only: stdio MCP + NSX Policy API (HTTPS 443).
   SSL bypass: verify_ssl is on by default; trust a private CA via the SSL_CERT_FILE env var; verify_ssl false only for isolated labs with self-signed certs.
@@ -51,7 +51,7 @@ VMware NSX networking management — 33 MCP tools for segments, gateways, NAT, r
 ## Quick Install
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.9.1
+uv tool install vmware-nsx-mgmt==1.10.0
 vmware-nsx init      # guided setup: writes config + .env (chmod 600, password grep-safe), then verifies
 vmware-nsx doctor
 ```
@@ -179,7 +179,7 @@ All MCP tools accept an optional `target` parameter to select which NSX Manager 
 | IP Pools | `list_ip_pools` | Read | List IP pools with usage summary |
 | | `get_ip_pool_usage` | Read | Show allocation usage for a pool |
 | | `create_ip_pool` | Write | Create a new IP address pool with allocation ranges |
-| | `delete_ip_pool` | Write | Permanently delete an IP address pool |
+| | `delete_ip_pool` | Write | Permanently delete an IP address pool; refuses while IPs are allocated |
 | Fabric | `list_transport_zones` | Read | List transport zones with type (OVERLAY/VLAN) |
 | | `list_transport_nodes` | Read | List transport nodes with node type and status |
 | | `list_edge_clusters` | Read | List edge clusters with member count and deployment type |
@@ -190,7 +190,7 @@ All MCP tools accept an optional `target` parameter to select which NSX Manager 
 | Troubleshoot | `get_logical_port_status` | Read | Realized state of all ports on a segment |
 | | `get_segment_port_for_vm` | Read | Find which segment a VM is connected to by display name |
 
-Write tools require explicit parameters and are audit-logged. Dry-run preview (`--dry-run`) is a CLI feature; MCP write tools execute directly, with no confirmation step of their own — call one only after the user has explicitly asked for that change.
+Write tools require explicit parameters and are audit-logged. The five `delete_*` tools preview by default: without `confirm=True` they return `blast_radius` (what would be removed, `blockers`, `unmeasured`) and change nothing. Show it to the user and pass `confirm=True` only after they decide; it is refused while a blocker remains or a read failed. Other MCP write tools execute directly — call one only after the user has explicitly asked for that change.
 
 ### List results are envelopes — read `truncated` before you summarise
 
@@ -292,8 +292,8 @@ The password environment variable is missing. Variable names follow the pattern 
 - **Read-heavy**: 20 of 33 tools are read-only (list, get, status, health, troubleshoot)
 - **Audit logging**: All operations logged to `~/.vmware/audit.db` (SQLite WAL, via vmware-policy) with timestamp, user, target, operation, parameters, and result
 - **Double confirmation**: CLI write commands require two separate confirmation prompts before executing
-- **Dry-run mode**: All CLI write commands support `--dry-run` to preview API calls without executing (MCP write tools execute directly and are audit-logged)
-- **Dependency checks**: Segment delete refuses while ports are attached. Tier-1 delete first checks (read-only) for attached or Tier-1-scoped segments, NAT rules, static routes, service interfaces, extra locale-services, IPsec / L2 VPN services, a DNS forwarder and attached LB services; while any remain it refuses, deletes nothing and lists their ids (`--dry-run` runs the same check). Only a clean gateway has its default locale-service removed and is then deleted
+- **Dry-run mode**: All CLI write commands support `--dry-run` to preview API calls without executing (MCP deletes preview unless `confirm=True`; other MCP writes execute directly and are audit-logged)
+- **Dependency checks**: Segment delete refuses while ports are attached. Tier-1 delete first checks (read-only) for attached or Tier-1-scoped segments, NAT rules, static routes, service interfaces, extra locale-services, IPsec / L2 VPN services, a DNS forwarder and attached LB services; while any remain it refuses, deletes nothing and lists their ids (`--dry-run` runs the same check). Only a clean gateway has its default locale-service removed and is then deleted. IP pool delete (MCP) refuses while addresses are allocated
 - **Input validation**: resource IDs restricted to letters, digits, `-` and `_`; NAT action checked against the allowed set; required fields checked (translated address for SNAT/DNAT/REFLEXIVE, CIDR + ranges per IP-pool subnet). CIDR/IP syntax and gateway existence are not checked client-side — they are left to NSX Manager's own API validation
 - **Prompt injection defense**: NSX object names returned from the API are sanitized via `_sanitize()` — strips control characters, truncates to 500 chars
 - **Credential safety**: Passwords loaded only from environment variables (`.env` file), never from `config.yaml`
@@ -302,7 +302,7 @@ The password environment variable is missing. Variable names follow the pattern 
 ## Setup
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.9.1
+uv tool install vmware-nsx-mgmt==1.10.0
 vmware-nsx init      # writes ~/.vmware-nsx/config.yaml + .env (chmod 600), then verifies
 vmware-nsx doctor
 ```

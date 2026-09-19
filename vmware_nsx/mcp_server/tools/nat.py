@@ -2,10 +2,10 @@
 
 from typing import Literal, Optional
 
-from vmware_policy import report_tool_failure, vmware_tool
+from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _delete_error, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -71,36 +71,42 @@ def create_nat_rule(
 def delete_nat_rule(
     tier1_id: str,
     rule_id: str,
+    confirm: bool = False,
     target: Optional[str] = None,
-) -> str:
+) -> dict:
     """[WRITE] Permanently delete a NAT rule from a Tier-1 gateway's USER NAT section.
 
     Irreversible: traffic matched by the rule stops being translated
     immediately, which can break inbound (DNAT) or outbound (SNAT)
-    connectivity. Run list_nat_rules on the same tier1_id first to confirm the
-    rule_id and review its action and networks, and confirm with the user before
-    deleting. Returns a confirmation string, or an "Error: ..." string — not a
-    dict.
+    connectivity. Without confirm=True this only previews: it returns
+    blast_radius (the gateway, the rule's action, source/destination match and
+    translation, enabled flag, blockers, unmeasured) and deletes nothing. Show
+    that to the user and get their decision. Do not set confirm=True on your
+    own because the user asked to delete earlier: they have not seen the blast
+    radius yet. confirm=True refuses when the rule could not be read, and a
+    rule_id not on that gateway is an error. Returns {"action": "preview" |
+    "deleted", "blast_radius": ...}, else {"error", "hint", "blast_radius"?}.
 
     Args:
         tier1_id: Gateway that owns the rule, as returned by list_tier1_gateways.
         rule_id: NAT rule ID to delete, as returned by list_nat_rules.
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
         target: NSX Manager target from config (default if omitted).
     """
+    hint = (
+        f"Run list_nat_rules on '{tier1_id}' to confirm the rule_id, or "
+        "'vmware-nsx doctor' to check connectivity."
+    )
     try:
+        from vmware_nsx.ops.delete_gate import nat_rule_delete_blast_radius, preview, refuse_unless_clear
         from vmware_nsx.ops.nat_route_mgmt import delete_nat_rule as _delete
 
         client = server._get_connection(target)
+        radius = nat_rule_delete_blast_radius(client, tier1_id, rule_id)
+        if confirm is not True:
+            return preview(radius)
+        refuse_unless_clear("delete_nat_rule", radius)
         _delete(client, tier1_id, rule_id)
-        return f"NAT rule '{rule_id}' deleted from '{tier1_id}'."
+        return {"action": "deleted", "deleted": rule_id, "blast_radius": radius}
     except Exception as e:
-        msg = _safe_error(e, "nsx")
-        # This tool returns a string, so @vmware_tool sees an ordinary return
-        # and would audit the failed delete as status=ok while telling the
-        # circuit breaker the call succeeded. Declare the failure explicitly.
-        report_tool_failure(msg)
-        return (
-            f"Error: the rule was NOT deleted. {msg} "
-            f"Run list_nat_rules on '{tier1_id}' to confirm the rule_id, or "
-            f"'vmware-nsx doctor' to check connectivity."
-        )
+        return _delete_error(e, hint)

@@ -1,3 +1,58 @@
+## v1.10.0 — MCP deletes preview by default and state their blast radius
+
+**Breaking for MCP callers.** `delete_segment`, `delete_tier1_gateway`, `delete_nat_rule`,
+`delete_static_route` and `delete_ip_pool` take a new `confirm: bool = False`. A call without
+`confirm=True` no longer deletes: it returns `{"action": "preview", "blast_radius": {...}, "hint"}`
+and makes no DELETE. An agent or Pilot step that deleted with a bare call must now pass
+`confirm=True` — after the user has seen the preview. Only the literal `True` acts.
+
+**The five tools return a dict, not a string.** They returned a sentence ("Segment 'x' deleted." /
+"Error: …"). They now return `{"action": "deleted", "deleted": <id>, "blast_radius": {...}}`, or the
+family envelope `{"error", "hint"}` — with `blast_radius` when the gate refused. Callers that
+matched on the sentence must read `action` / `error` instead.
+
+**What `blast_radius` holds** (identifiers capped at 16, plus `blockers` and `unmeasured`):
+a segment's name, path, gateway, transport zone, subnets, `port_count` and `port_ids`; a Tier-1's
+name, `tier0_path`, the `default` locale-service and edge cluster the delete removes, and its
+`dependents` by kind with `dependent_counts` (up to 10 ids per kind, so 10 means "10 or more");
+a NAT rule's gateway, action, source/destination match, translation, ports and enabled flag; a
+static route's gateway, network and next hops; an IP pool's name, `pool_usage`,
+`allocation_count` (Policy `ip-allocations`), `realized_allocation_count` (NSX's
+`pool_usage.allocated_ip_allocations`) and `allocated_ips`.
+
+**`confirm=True` is refused, deleting nothing, when:**
+- a blocker is present — the existing refusals, with their existing text (ports attached to a
+  segment; anything still depending on a Tier-1) and one new one: **an IP pool with allocated
+  addresses** (NSX rejected that delete anyway; now it is refused before the call, naming them).
+  Allocated means either count above zero: addresses realized outside Policy — e.g. a TEP pool's
+  addresses held by transport nodes — never appear in `ip-allocations`, only in `pool_usage`;
+- the pool's `pool_usage.allocated_ip_allocations` is absent or not a non-negative integer
+  (`unmeasured` lists `pool_usage`) — an unreadable count is not a zero;
+- any read the blast radius depends on failed with anything other than 404 (`unmeasured` lists
+  it). "Could not look" is not "nothing there".
+
+A missing object is an error on both paths, not an empty preview: a NAT rule, static route or IP
+pool that is not in its collection names the list tool to run; a segment or Tier-1 that answers
+404 carries the connection layer's 404 teaching text. Before, deleting a missing NAT rule or route
+was sent to NSX.
+
+**Reads added before a delete, all endpoints this skill already used:** the segment and Tier-1
+GETs (`get_segment`, `get_tier1_gateway`); the Tier-1's locale-services; the NAT-rule,
+static-route and IP-pool collections, walked to find the object (the per-object GET is not
+used); the pool's `ip-allocations`. An account that deletes these objects now also needs read
+access to them.
+
+**Audit.** A refusal is audited as a failure in both `~/.vmware/audit.db` and
+`~/.vmware-nsx/audit.log` (it is an `error` envelope; `report_tool_failure` is no longer needed on
+these tools). A preview is filed in `~/.vmware-nsx/audit.log` as `preview`, not `ok`, as the CLI
+files `--dry-run` as `dry-run`. Gate refusals pass the error sanitizer with a 2000-character cap
+rather than 300, so a Tier-1 refusal that names several kinds of dependents keeps its remedy.
+
+**Unchanged:** the CLI. `vmware-nsx segment delete` and the other delete commands still ask twice,
+still support `--dry-run`, and call the same ops functions as before.
+* Requires `vmware-policy>=1.17.0`, which audits a `confirm=False` preview as `dry_run` and redacts long
+  audit text in linear time.
+
 ## v1.9.1 — CLI reads are audited
 
 No CLI read wrote `~/.vmware/audit.db` — only MCP calls and CLI writes (`@guarded`) did. A live
