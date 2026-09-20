@@ -1,6 +1,6 @@
 {
   "name": "@zw008/vmware-nsx",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "VMware NSX networking management with 33 MCP tools: segments, gateways, NAT, routing, IPAM.",
   "private": true,
   "license": "MIT",

@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "vmware-nsx",
   "displayName": "VMware NSX",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "VMware NSX networking management with 33 MCP tools: segments, gateways, NAT, routing, IPAM.",
   "author": {
     "name": "Wei Zhou",
