@@ -13,7 +13,7 @@ import ssl
 from mcp.server.fastmcp import FastMCP
 from vmware_policy import sanitize
 
-from vmware_nsx.config import ConfigError
+from vmware_nsx.config import ConfigError, load_config
 from vmware_nsx.connection import NsxApiError
 from vmware_nsx.ops.delete_gate import DeleteRefusedError
 from vmware_nsx import __version__
@@ -116,17 +116,64 @@ def _delete_error(exc: Exception, hint: str) -> dict:
     return out
 
 
-mcp = FastMCP(
-    "vmware-nsx",
-    instructions=(
-        "VMware NSX networking management. "
-        "Query and configure network segments, Tier-0/Tier-1 gateways, "
-        "NAT rules, static routes, IP pools, transport zones/nodes, "
-        "and edge clusters. Check NSX health, alarms, and troubleshoot "
-        "connectivity. For DFW firewall/microsegmentation, use vmware-nsx-security. "
-        "For VM operations, use vmware-aiops. For monitoring, use vmware-monitor."
-    ),
+_BASE_INSTRUCTIONS = (
+    "VMware NSX networking management. "
+    "Query and configure network segments, Tier-0/Tier-1 gateways, "
+    "NAT rules, static routes, IP pools, transport zones/nodes, "
+    "and edge clusters. Check NSX health, alarms, and troubleshoot "
+    "connectivity. For DFW firewall/microsegmentation, use vmware-nsx-security. "
+    "For VM operations, use vmware-aiops. For monitoring, use vmware-monitor."
 )
+
+_TARGET_RULE = (
+    " Choosing a target: every tool that reaches NSX takes `target`, and each "
+    "target is one NSX Manager. Choose it from what the user asked. vmware-nsx "
+    "and vmware-nsx-security are two skills over the same NSX Manager, so the "
+    "same target name usually appears in both. If the request does not say which "
+    "manager to use, ask the user which one before querying. Say which `target` "
+    "answered in the answer."
+)
+
+
+def _target_instructions() -> str:
+    """Server instructions that name the configured targets and how to choose one.
+
+    ``initialize`` hands the client this text, and for a skill whose every tool
+    takes ``target`` it is the only place a client learns which managers exist.
+    Without it the model calls tools with no target, silently gets the default,
+    and answers confidently about the wrong system — on 2026-09-15 Monitor's
+    default was a standalone ESXi host, and "how many VMs does the vCenter have"
+    was answered from that host.
+
+    Built at run time so it cannot drift from the operator's file, and never
+    raises: a missing config is the normal state before ``vmware-nsx init`` and must
+    not stop the server from starting — the tools report that error themselves,
+    with the remedy.
+
+    All three branches keep the ``Configured targets:`` sentence. A client shown
+    no listing cannot tell "this skill has no targets" from "this skill could not
+    read them", and the first reading is the one that produces a confident answer
+    about a system nobody chose. The gate probes under an empty HOME for exactly
+    this reason: with the operator's config present, the branch that omits the
+    listing is unreachable.
+    """
+    try:
+        cfg = load_config()
+    except Exception as exc:  # noqa: BLE001 — instructions are advisory, startup is not
+        # Only the exception's *type*: its text quotes the config path.
+        detail = f"could not be read ({type(exc).__name__}) — run `vmware-nsx doctor`"
+    else:
+        listed = "; ".join(
+            f"{name} ({t.host}{', default' if name == cfg.default_target else ''})"
+            for name, t in cfg.targets.items()
+        )
+        detail = listed or (
+            "none yet — add one under `targets:` in ~/.vmware-nsx/config.yaml"
+        )
+    return f"{_BASE_INSTRUCTIONS} Configured targets: {detail}.{_TARGET_RULE}"
+
+
+mcp = FastMCP("vmware-nsx", instructions=_target_instructions())
 
 # FastMCP takes no version argument and leaves the lowlevel server's at
 # None, which makes `initialize` answer with the MCP SDK's version rather
