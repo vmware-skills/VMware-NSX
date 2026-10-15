@@ -132,9 +132,11 @@ from vmware_nsx.policy_environment import _cached_config, _environment_for  # no
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def main(expose: Optional[str] = None, allow_write: Optional[str] = None) -> None:
     """Run the MCP server over stdio."""
     logging.basicConfig(level=logging.INFO)
+    from vmware_policy.exposure import apply_or_exit
+    apply_or_exit(mcp, skill="nsx", expose=expose, allow_write=allow_write)
     mcp.run(transport="stdio")
 
 # The docstrings above are the schema. `describe_tool_parameters` copies each
