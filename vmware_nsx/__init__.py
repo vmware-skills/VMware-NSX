@@ -1,3 +1,3 @@
 """VMware NSX networking management."""
 
-__version__ = "1.13.0"
+__version__ = "1.14.0"
