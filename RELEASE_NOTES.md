@@ -1,3 +1,17 @@
+## Unreleased — calls on one target run side by side over HTTPS
+
+When `vmware-nsx mcp` serves the network (`--transport https` or `http`), calls no longer queue behind each other.
+Calls that name the same target, or name no target, now run side by side instead of one at a time (HLD §16
+D-13(2), via vmware-policy 1.22.0):
+
+- Each call gets its own session to the NSX Manager for as long as it runs, so two calls never share a login.
+- Each target keeps up to `VMWARE_MCP_POOL_SIZE` sessions (default 2). Each session is a login on the target, so
+  raise it only as far as the account's session limit allows.
+- A call that finds every session busy waits at most 300 s for one, then fails with a message saying so.
+- A session that has expired or stopped answering is closed and replaced the next time a call needs it.
+
+stdio and the CLI are unchanged: one session per target, reused.
+
 ## v1.13.0 — serve MCP over HTTPS
 
 `vmware-nsx mcp` can now serve the network as well as stdio (HLD §16, via vmware-policy 1.21.0):

@@ -12,6 +12,7 @@ import ssl
 
 from mcp.server.fastmcp import FastMCP
 from vmware_policy import sanitize
+from vmware_policy.pool import PoolTimeoutError
 
 from vmware_nsx.config import ConfigError, load_config
 from vmware_nsx.connection import NsxApiError
@@ -97,6 +98,9 @@ def _safe_error(exc: Exception, tool: str) -> str:
         ConnectionError,
         ConfigError,
         NsxApiError,
+        # Authored by vmware_policy.pool: names the target and the remedy
+        # (retry, or raise VMWARE_MCP_POOL_SIZE); a RuntimeError, so listed by name.
+        PoolTimeoutError,
     )
     if isinstance(exc, _passthrough):
         return sanitize(str(exc), 300)

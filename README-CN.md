@@ -376,8 +376,9 @@ claude mcp add --transport http vmware-nsx https://mcp.example.com:8443/mcp \
   证书要用客户端信任、且覆盖这些名字的证书。
 - 在同一台机器上由反向代理终结 TLS 时，用 `--transport http --host 127.0.0.1 --public-name mcp.example.com`，
   并让代理透传 `Authorization` 头。
-- 审计日志把每个调用者记为 `token:<名字>`。指定不同 target 的调用并行执行；不指定 target 的调用逐个执行，
-  所以多人共用一个 server 时请写明 target。
+- 审计日志把每个调用者记为 `token:<名字>`。无论是否指定 target，调用都并行执行：每个 target 最多保持
+  `VMWARE_MCP_POOL_SIZE` 个会话（默认 2），每个会话都是在该 target 上的一次登录。会话全被占用时，
+  调用最多等待 300 秒。
 - **能连到这个端点的人，都以该 server 配置的账号操作。** token 只用来识别调用者，不在平台上授予任何权限。
   每个权限级别单独起一个端点。
 

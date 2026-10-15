@@ -317,8 +317,9 @@ claude mcp add --transport http vmware-nsx https://mcp.example.com:8443/mcp \
   before it binds that unauthenticated requests get 401. Use a certificate your clients trust for those names.
 - Behind a TLS-terminating reverse proxy on the same machine use `--transport http --host 127.0.0.1
   --public-name mcp.example.com` and pass the `Authorization` header through.
-- The audit log records each caller as `token:<name>`. Calls naming different targets run in parallel; calls that
-  name no target run one at a time, so name the target when several people share a server.
+- The audit log records each caller as `token:<name>`. Calls run side by side, with or without a target: each
+  target keeps up to `VMWARE_MCP_POOL_SIZE` sessions (default 2), and each session is a login on the target. A call
+  that finds them all busy waits at most 300 s for one.
 - **Everyone who can reach the endpoint acts with this server's account.** Tokens identify callers; they grant
   nothing on the platform. Run one endpoint per privilege level.
 

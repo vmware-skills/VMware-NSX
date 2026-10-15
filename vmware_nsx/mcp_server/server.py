@@ -41,6 +41,7 @@ For monitoring, use vmware-monitor.
 
 
 import logging
+import threading
 from typing import Any, Optional
 
 from vmware_policy import describe_tool_parameters
@@ -58,6 +59,10 @@ __all__ = ["mcp", "main", "_get_connection", "_safe_error", "_DOCTOR_HINT"]
 # ---------------------------------------------------------------------------
 
 _conn_mgr: Optional[ConnectionManager] = None
+# Tools run in worker threads on a network transport: without the lock two
+# first calls could each build a manager, and one manager's pool would be lost
+# with its sessions still logged in.
+_conn_mgr_lock = threading.Lock()
 
 
 def _get_connection(target: Optional[str] = None) -> Any:
@@ -68,13 +73,17 @@ def _get_connection(target: Optional[str] = None) -> Any:
     every tool pick up the patched callable.
     """
     global _conn_mgr  # noqa: PLW0603
-    if _conn_mgr is None:
-        # No env-var read here: load_config resolves the path (explicit arg,
-        # then $VMWARE_NSX_CONFIG, then the default). This was a third copy of
-        # that rule, and copies are how the doctor's copy drifted (形态 #6).
-        config = load_config()
-        _conn_mgr = ConnectionManager(config)
-    return _conn_mgr.connect(target)
+    mgr = _conn_mgr
+    if mgr is None:
+        with _conn_mgr_lock:
+            if _conn_mgr is None:
+                # No env-var read here: load_config resolves the path (explicit
+                # arg, then $VMWARE_NSX_CONFIG, then the default). This was a
+                # third copy of that rule, and copies are how the doctor's copy
+                # drifted (形态 #6).
+                _conn_mgr = ConnectionManager(load_config())
+            mgr = _conn_mgr
+    return mgr.connect(target)
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +160,7 @@ def main(
         skill="nsx",
         expose=expose, allow_write=allow_write, transport=transport, host=host, port=port,
         cert=cert, key=key, public_name=public_name, token_file=token_file,
+        pooled=True,
     )
 
 # The docstrings above are the schema. `describe_tool_parameters` copies each
