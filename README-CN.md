@@ -386,6 +386,7 @@ claude mcp add --transport http vmware-nsx https://mcp.example.com:8443/mcp \
   调用最多等待 300 秒。
 - **能连到这个端点的人，都以该 server 配置的账号操作。** token 只用来识别调用者，不在平台上授予任何权限。
   每个权限级别单独起一个端点。
+- **一个端点给多人或多种角色用：** 给每个 token 指定角色（`vmware-audit token create 名字 --role reader`，或在 `roles.yaml` 里定义可用的工具和 target；需 vmware-policy ≥ 1.24.0）。角色只能限定这个 token 在本端点上能调用什么，不能超出账号本身的权限。详见 vmware-policy README 的「网络调用者的角色」一节。
 
 **只提供读工具，加上你选定的写工具：**
 

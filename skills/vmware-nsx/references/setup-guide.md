@@ -14,19 +14,19 @@ Complete setup and security guide for `vmware-nsx`.
 ### Via uv (recommended)
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.14.0
+uv tool install vmware-nsx-mgmt==1.15.0
 ```
 
 ### Via pip
 
 ```bash
-pip install vmware-nsx-mgmt==1.14.0
+pip install vmware-nsx-mgmt==1.15.0
 ```
 
 ### From source
 
 ```bash
-git clone --branch v1.14.0 https://github.com/vmware-skills/VMware-NSX.git
+git clone --branch v1.15.0 https://github.com/vmware-skills/VMware-NSX.git
 cd VMware-NSX
 pip install -e .
 ```
@@ -295,6 +295,7 @@ vmware-nsx mcp --transport https --host 0.0.0.0 --port 8443 \
 - **Everyone who can reach the endpoint acts with this server's account.** Tokens identify callers; they grant
   nothing on the platform. Run one endpoint per privilege level (for example a read-only account behind
   `--expose read`, and a separate endpoint for operators).
+- **Several people or roles on one endpoint:** give each token a role (`vmware-audit token create NAME --role reader`, or a role in `roles.yaml` naming tools and targets; vmware-policy ≥ 1.24.0). A role limits what the token may call on this endpoint; it cannot grant more than the account has. See vmware-policy's README, "Roles for network callers".
 
 ## Read-Only Operation
 
