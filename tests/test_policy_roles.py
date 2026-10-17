@@ -53,3 +53,30 @@ def test_the_resolver_uses_the_config_the_connection_manager_holds(monkeypatch):
     held = object()
     monkeypatch.setattr(server, "_conn_mgr", types.SimpleNamespace(_config=held))
     assert pr._connection_config() is held  # the manager's copy, not the edited file
+
+
+@pytest.mark.unit
+def test_the_resolver_names_a_target_from_a_real_config(monkeypatch, tmp_path):
+    """The resolver must run against a real loaded config, not a stand-in.
+
+    It returned ``get_target_strict(...).name`` — and this skill's TargetConfig has
+    no ``name``, so it raised AttributeError on every call: a target-limited role
+    was refused everything here. No test called it with a real config (found on
+    Log-Insight, 2026-10-17; same code in five skills).
+    """
+    from vmware_nsx import policy_roles as pr
+    from vmware_nsx.config import load_config
+
+    conf = tmp_path / "config.yaml"
+    conf.write_text(
+        "targets:\n  lab-a:\n    host: a.example\n    username: u\n"
+        "  lab-b:\n    host: b.example\n    username: u\n"
+        "default_target: lab-b\n",
+        encoding="utf-8",
+    )
+    real = load_config(conf)
+    monkeypatch.setattr(pr, "_connection_config", lambda: real)
+    assert pr._target_name(None) == "lab-b"
+    assert pr._target_name("lab-a") == "lab-a"
+    with pytest.raises(KeyError):
+        pr._target_name("no-such-target")

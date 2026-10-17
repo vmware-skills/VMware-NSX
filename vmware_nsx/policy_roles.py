@@ -36,7 +36,12 @@ def _connection_config():
 def _target_name(target: str | None) -> str:
     """The target the connection layer would use for ``target`` (or the default)."""
     config = _connection_config()
-    return config.get_target_strict(target or config.default_target or "").name
+    name = target or config.default_target or ""
+    # Raises KeyError for a name the config does not have. The key is the name:
+    # this skill's TargetConfig carries no `name` field, and reading one raised
+    # AttributeError on every call.
+    config.get_target_strict(name)
+    return name
 
 
 try:
