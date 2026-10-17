@@ -5,7 +5,7 @@ from typing import Optional
 from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _hint_for, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -34,7 +34,7 @@ def get_logical_port_status(segment_id: str, target: Optional[str] = None) -> di
         client = server._get_connection(target)
         return _get_port(client, segment_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -63,4 +63,4 @@ def get_segment_port_for_vm(vm_display_name: str, target: Optional[str] = None) 
         client = server._get_connection(target)
         return _get_vm_seg(client, vm_display_name)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}

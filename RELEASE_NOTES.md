@@ -1,5 +1,9 @@
 ## Unreleased — a target-limited role can use this skill
 
+* **Error hints fit the error.** An error about the request itself (a 4xx other than 401/403, an unknown
+  target, a refused delete) no longer tells the agent to run `doctor`, which would report green; an argument error that may
+  name no fix offers doctor only as a fallback. Connection, credential, 5xx and unparseable-response errors keep it.
+
 * **Roles (HLD §18): the target resolver raised on every call.** It read a `name` field that this skill's target
   config does not have, so every call by a token whose role lists targets was refused as "cannot be resolved".
   Tokens with the built-in `admin` / `reader` roles, stdio and the CLI were not affected. Found on Log-Insight

@@ -1,12 +1,13 @@
 """Shared MCP primitives: the FastMCP instance and the error sanitizer.
 
 Tool modules under ``vmware_nsx.mcp_server.tools`` import ``mcp`` (to register tools),
-``_safe_error`` (agent-safe error formatting), and ``_DOCTOR_HINT`` from here.
+``_safe_error`` (agent-safe error formatting), and ``_hint_for`` from here.
 The connection helper lives in ``vmware_nsx.mcp_server.server`` instead, so that tests can
 ``patch("vmware_nsx.mcp_server.server._get_connection")`` and have every tool pick it up;
 tool modules therefore call ``server._get_connection(...)`` at runtime.
 """
 
+import json
 import logging
 import ssl
 
@@ -15,13 +16,47 @@ from vmware_policy import sanitize
 from vmware_policy.pool import PoolTimeoutError
 
 from vmware_nsx.config import ConfigError, load_config
-from vmware_nsx.connection import NsxApiError
+from vmware_nsx.connection import SESSION_CREATE_PATH, NsxApiError, is_request_status
 from vmware_nsx.ops.delete_gate import DeleteRefusedError
 from vmware_nsx import __version__
 
 logger = logging.getLogger("mcp_server")
 
 _DOCTOR_HINT = "Run 'vmware-nsx doctor' to verify connectivity."
+
+#: For an error about the request itself: the message already names the fix,
+#: and doctor would report green (same shape as VMware-Monitor 2.4.1).
+_FIX_IN_MESSAGE_HINT = "The error message says what to change; connectivity is not the problem."
+#: A ValueError's text is usually this skill's own remedy, but not always: one
+#: raised while parsing the server's answer names no fix. So it does not claim
+#: connectivity is fine (independent review, 2026-10-18).
+_CHECK_MESSAGE_HINT = (
+    "The error message should say what to change; if it names no fix, run "
+    "'vmware-nsx doctor'."
+)
+
+#: ValueErrors whose text was not authored as a remedy: a body that was not JSON
+#: (a reverse proxy answering HTML), not UTF-8, or a TLS error. Doctor checks those.
+_UNAUTHORED_VALUE_ERRORS = (ssl.SSLError, json.JSONDecodeError, UnicodeError)
+
+
+def _is_request_error(exc: BaseException) -> bool:
+    """True when the Manager is reachable and the request itself is wrong.
+
+    A 4xx answered to a call (not the session login, and not 401/403), and the
+    ValueErrors this skill raises for an unknown target or a rejected argument
+    (``ConnectionManager.connect`` signals an unknown target with one).
+    """
+    if isinstance(exc, NsxApiError):
+        return is_request_status(exc.status_code) and exc.path != SESSION_CREATE_PATH
+    return isinstance(exc, ValueError) and not isinstance(exc, _UNAUTHORED_VALUE_ERRORS)
+
+
+def _hint_for(exc: BaseException) -> str:
+    """The ``hint`` for a tool error: doctor only where doctor can find the cause."""
+    if not _is_request_error(exc):
+        return _DOCTOR_HINT
+    return _FIX_IN_MESSAGE_HINT if isinstance(exc, NsxApiError) else _CHECK_MESSAGE_HINT
 
 #: Longest gate refusal passed to the caller (see ``_safe_error``).
 _REFUSAL_MAX = 2000
@@ -113,6 +148,12 @@ def _delete_error(exc: Exception, hint: str) -> dict:
     A dict with ``error`` is what both audit sinks read as a failure, so a
     refusal is audited as one without ``report_tool_failure``.
     """
+    from vmware_nsx.ops.delete_gate import DeleteRefusedError
+
+    # A refusal names its blocker; connectivity is fine, so the per-tool hint
+    # ("... or 'vmware-nsx doctor'") does not apply (review 2026-10-18).
+    if isinstance(exc, DeleteRefusedError):
+        hint = _FIX_IN_MESSAGE_HINT
     out: dict = {"error": _safe_error(exc, "nsx"), "hint": hint}
     radius = getattr(exc, "blast_radius", None)
     if isinstance(radius, dict):

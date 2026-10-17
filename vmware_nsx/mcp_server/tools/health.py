@@ -5,7 +5,7 @@ from typing import Optional
 from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _hint_for, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -47,7 +47,7 @@ def list_nsx_alarms(
         client = server._get_connection(target)
         return _list_alarms(client, severity=severity, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -75,7 +75,7 @@ def get_transport_node_status(node_id: str, target: Optional[str] = None) -> dic
         client = server._get_connection(target)
         return _get_tn_status(client, node_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -99,7 +99,7 @@ def get_edge_cluster_status(cluster_id: str, target: Optional[str] = None) -> di
         client = server._get_connection(target)
         return _get_ec_status(client, cluster_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -123,4 +123,4 @@ def get_nsx_manager_status(target: Optional[str] = None) -> dict:
         client = server._get_connection(target)
         return _get_mgr_status(client)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}

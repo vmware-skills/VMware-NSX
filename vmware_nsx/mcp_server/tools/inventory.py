@@ -5,7 +5,7 @@ from typing import Optional
 from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _hint_for, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -43,7 +43,7 @@ def list_segments(
         client = server._get_connection(target)
         return _list_segments(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -70,7 +70,7 @@ def get_segment(segment_id: str, target: Optional[str] = None) -> dict:
         client = server._get_connection(target)
         return _get_segment(client, segment_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -104,7 +104,7 @@ def list_tier0_gateways(
         client = server._get_connection(target)
         return _list_tier0s(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -129,7 +129,7 @@ def get_tier0_gateway(tier0_id: str, target: Optional[str] = None) -> dict:
         client = server._get_connection(target)
         return _get_tier0(client, tier0_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -164,7 +164,7 @@ def list_tier1_gateways(
         client = server._get_connection(target)
         return _list_tier1s(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -188,7 +188,7 @@ def get_tier1_gateway(tier1_id: str, target: Optional[str] = None) -> dict:
         client = server._get_connection(target)
         return _get_tier1(client, tier1_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -225,7 +225,7 @@ def list_transport_zones(
         client = server._get_connection(target)
         return _list_tzs(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -259,7 +259,7 @@ def list_transport_nodes(
         client = server._get_connection(target)
         return _list_tns(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -293,4 +293,4 @@ def list_edge_clusters(
         client = server._get_connection(target)
         return _list_ecs(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}

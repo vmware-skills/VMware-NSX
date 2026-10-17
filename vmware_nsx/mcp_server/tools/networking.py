@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _hint_for, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -41,7 +41,7 @@ def list_nat_rules(
         client = server._get_connection(target)
         return _list_nat(client, tier1_id, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -69,7 +69,7 @@ def get_bgp_neighbors(tier0_id: str, target: Optional[str] = None) -> dict:
         client = server._get_connection(target)
         return _get_bgp(client, tier0_id)
     except Exception as e:
-        return [{"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}]
+        return [{"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}]
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -112,7 +112,7 @@ def list_static_routes(
             client, tier1_id, gateway_type=gateway_type, limit=limit, offset=offset
         )
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -146,7 +146,7 @@ def list_ip_pools(
         client = server._get_connection(target)
         return _list_pools(client, limit=limit, offset=offset)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
@@ -171,4 +171,4 @@ def get_ip_pool_usage(pool_id: str, target: Optional[str] = None) -> dict:
         client = server._get_connection(target)
         return _get_usage(client, pool_id)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}

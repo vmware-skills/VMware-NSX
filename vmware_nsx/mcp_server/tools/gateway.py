@@ -5,7 +5,7 @@ from typing import Optional
 from vmware_policy import vmware_tool
 
 from vmware_nsx.mcp_server import server
-from vmware_nsx.mcp_server._shared import _DOCTOR_HINT, _delete_error, _safe_error, mcp
+from vmware_nsx.mcp_server._shared import _delete_error, _hint_for, _safe_error, mcp
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -65,7 +65,7 @@ def create_tier1_gateway(
             edge_cluster_path=edge_cluster_path,
         )
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True})
@@ -109,7 +109,7 @@ def update_tier1_gateway(
             ]
         return _update(client, tier1_id, **updates)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": True})
@@ -204,4 +204,4 @@ def configure_tier0_bgp(
         }
         return _configure(client, tier0_id, locale_service_id, bgp_config)
     except Exception as e:
-        return {"error": _safe_error(e, "nsx"), "hint": _DOCTOR_HINT}
+        return {"error": _safe_error(e, "nsx"), "hint": _hint_for(e)}

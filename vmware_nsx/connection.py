@@ -92,6 +92,20 @@ def _is_tls_error(exc: Exception) -> bool:
     return False
 
 
+#: The session login. Its 4xx answers are about credentials, not the request.
+SESSION_CREATE_PATH = "/api/session/create"
+
+
+def is_request_status(status_code: int | None) -> bool:
+    """True for a 4xx the Manager answered about the request itself.
+
+    401/403 are credentials and RBAC, which doctor checks; a missing status is a
+    transport failure. Everything else in 4xx means the Manager is reachable and
+    rejected these arguments, so doctor would report green (VMware-Monitor 2.4.1).
+    """
+    return status_code is not None and 400 <= status_code < 500 and status_code not in (401, 403)
+
+
 def _hint_for_status(status_code: int) -> str:
     """Return a short, actionable remediation hint for an HTTP error status."""
     if status_code == 404:
@@ -182,7 +196,7 @@ class NsxClient:
         )
         try:
             resp = self._client.post(
-                "/api/session/create",
+                SESSION_CREATE_PATH,
                 content=body.encode("utf-8"),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
@@ -208,7 +222,7 @@ class NsxClient:
                 "for this target in ~/.vmware-nsx/config.yaml, then run "
                 f"'vmware-nsx doctor'.{tls_note} Target: '{self._target_name}'",
                 method="POST",
-                path="/api/session/create",
+                path=SESSION_CREATE_PATH,
             ) from exc
         if resp.status_code in (401, 403):
             raise NsxApiError(
@@ -221,7 +235,7 @@ class NsxClient:
                 "~/.vmware-nsx/config.yaml. Special characters are safe (form-body auth).",
                 status_code=resp.status_code,
                 method="POST",
-                path="/api/session/create",
+                path=SESSION_CREATE_PATH,
             )
         if resp.status_code >= 400:
             raise NsxApiError(
@@ -231,7 +245,7 @@ class NsxClient:
                 "for this target.",
                 status_code=resp.status_code,
                 method="POST",
-                path="/api/session/create",
+                path=SESSION_CREATE_PATH,
             )
         self._token = resp.headers.get("x-xsrf-token")
         if not self._token:
@@ -327,8 +341,11 @@ class NsxClient:
                     # path is the only expendable part and now truncates first.
                     f"NSX Manager returned HTTP {resp.status_code}. "
                     f"{_hint_for_status(resp.status_code)} "
-                    "Run 'vmware-nsx doctor' to check this target. "
-                    f"({method} {path})",
+                    # A 4xx about the request gets no doctor line: the Manager
+                    # answered, and doctor would report green.
+                    + ("" if is_request_status(resp.status_code)
+                       else "Run 'vmware-nsx doctor' to check this target. ")
+                    + f"({method} {path})",
                     status_code=resp.status_code,
                     method=method,
                     path=path,
