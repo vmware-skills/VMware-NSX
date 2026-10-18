@@ -1,4 +1,4 @@
-## Unreleased — a target-limited role can use this skill
+## v1.15.1 — a target-limited role can use this skill; error hints fit the error
 
 * **Error hints fit the error.** An error about the request itself (a 4xx other than 401/403, an unknown
   target, a refused delete) no longer tells the agent to run `doctor`, which would report green; an argument error that may
@@ -8,6 +8,8 @@
   config does not have, so every call by a token whose role lists targets was refused as "cannot be resolved".
   Tokens with the built-in `admin` / `reader` roles, stdio and the CLI were not affected. Found on Log-Insight
   (same code in five skills); the new test calls the resolver on a real loaded config.
+
+* Requires `mcp` ≥ 1.30, a security floor (GHSA-84m7-p3x7-pcfv).
 
 ## v1.15.0 — roles for network callers (HLD §18)
 
