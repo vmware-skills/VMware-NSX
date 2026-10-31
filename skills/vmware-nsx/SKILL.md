@@ -24,6 +24,8 @@ compatibility: >
 
 # VMware NSX
 
+> Self-test: [guide](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md).
+
 > **Disclaimer**: This is a community-maintained open-source project and is **not affiliated with, endorsed by, or sponsored by VMware, Inc. or Broadcom Inc.** "VMware" and "NSX" are trademarks of Broadcom. Source code is publicly auditable at [github.com/vmware-skills/VMware-NSX](https://github.com/vmware-skills/VMware-NSX) under the MIT license.
 
 VMware NSX networking management — 33 MCP tools for segments, gateways, NAT, routing, and IPAM.
