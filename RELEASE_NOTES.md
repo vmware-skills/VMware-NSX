@@ -1,3 +1,7 @@
+## Unreleased — system proxy bypass
+
+* The NSX Manager REST client now honors system proxy bypass rules for the configured origin while preserving TLS verification and CA environment settings.
+
 ## v1.15.1 — a target-limited role can use this skill; error hints fit the error
 
 * **Error hints fit the error.** An error about the request itself (a 4xx other than 401/403, an unknown

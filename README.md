@@ -345,6 +345,12 @@ least-privilege.
 
 Details: `skills/vmware-nsx/references/setup-guide.md` ("Serving MCP over HTTPS", "Limiting which tools are offered").
 
+## System proxy bypass
+
+The NSX Manager REST client honors the operating system proxy bypass list for the configured origin.
+TLS verification still follows `verify_ssl`, and CA environment settings such as `SSL_CERT_FILE` remain active.
+Other origins retain their normal proxy routing.
+
 ## License
 
 [MIT](LICENSE)
