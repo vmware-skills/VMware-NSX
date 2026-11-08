@@ -14,19 +14,19 @@ Complete setup and security guide for `vmware-nsx`.
 ### Via uv (recommended)
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.15.1
+uv tool install vmware-nsx-mgmt==1.15.2
 ```
 
 ### Via pip
 
 ```bash
-pip install vmware-nsx-mgmt==1.15.1
+pip install vmware-nsx-mgmt==1.15.2
 ```
 
 ### From source
 
 ```bash
-git clone --branch v1.15.1 https://github.com/vmware-skills/VMware-NSX.git
+git clone --branch v1.15.2 https://github.com/vmware-skills/VMware-NSX.git
 cd VMware-NSX
 pip install -e .
 ```
