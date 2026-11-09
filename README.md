@@ -15,6 +15,10 @@ VMware NSX networking management: segments, gateways, NAT, routing, IPAM — 33 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+MCP uses local stdio by default. Opt-in HTTPS opens the configured listener and requires TLS plus caller authentication; it is a network service, not a local-only mode. Credential examples create owner-only placeholder files without overwriting existing files; edit secrets locally.
+
+Container examples build a local version-tagged image and run it with `--pull=never`, avoiding registry fallback. A local version tag is not an immutable image digest.
+
 ## Companion Skills
 
 | Skill | Scope | Tools | Install |
@@ -32,10 +36,10 @@ VMware NSX networking management: segments, gateways, NAT, routing, IPAM — 33 
 
 ```bash
 # Via PyPI
-uv tool install vmware-nsx-mgmt
+uv tool install vmware-nsx-mgmt==1.15.2
 
 # Or pip
-pip install vmware-nsx-mgmt
+pip install vmware-nsx-mgmt==1.15.2
 ```
 
 ### Offline / Air-Gapped Install (from source)
@@ -73,12 +77,20 @@ mkdir -p ~/.vmware-nsx
 cp config.example.yaml ~/.vmware-nsx/config.yaml
 # Edit with your NSX Manager credentials
 
-echo "VMWARE_NSX_NSX_PROD_PASSWORD=your_password" > ~/.vmware-nsx/.env
-chmod 600 ~/.vmware-nsx/.env
+(
+  umask 077
+  set -C  # Refuse existing files; edit an existing .env locally instead
+  cat > ~/.vmware-nsx/.env <<'EOF'
+VMWARE_NSX_NSX_PROD_PASSWORD=REPLACE_IN_LOCAL_EDITOR
+EOF
+)
+# Before continuing, edit .env locally; never type live secrets into shell commands.
 
 # Verify
 vmware-nsx doctor
 ```
+
+This writes placeholders only. Enter passwords or tokens using a local editor after creation; do not paste live credentials into terminal commands, chat or commits. If the file exists, the command refuses to overwrite it; edit the existing file after checking its permissions are `600`.
 
 ## What This Skill Does
 
@@ -179,7 +191,7 @@ vmware-nsx doctor
 
 ## MCP Server
 
-**After `uv tool install vmware-nsx-mgmt`, start the MCP server with one command** (v1.5.15+):
+**After `uv tool install vmware-nsx-mgmt==1.15.2`, start the MCP server with one command** (v1.5.15+):
 
 ```bash
 # Recommended — single command, no network re-resolve
@@ -212,7 +224,7 @@ Add to your AI agent's MCP config:
 
 ```bash
 # Run without installing (requires PyPI access each launch)
-uvx --from vmware-nsx-mgmt vmware-nsx mcp
+uvx --from vmware-nsx-mgmt==1.15.2 vmware-nsx mcp
 
 # Legacy entry point (still works, kept for backward compatibility)
 vmware-nsx-mcp

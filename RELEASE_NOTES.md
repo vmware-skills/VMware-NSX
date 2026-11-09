@@ -5,6 +5,13 @@
 ### system proxy bypass
 * The NSX Manager REST client now honors system proxy bypass rules for the configured origin while preserving TLS verification and CA environment settings.
 
+## Unreleased — security documentation corrections
+
+Clarify actual capability, credential, local-write and transport boundaries where applicable.
+Pin documented setup/fallback tools and make credential examples owner-only before writing,
+without overwriting existing files. Runtime permissions, TLS defaults and approval behavior are unchanged.
+These edits do not establish a new ClawHub scan verdict.
+
 ## v1.15.1 — a target-limited role can use this skill; error hints fit the error
 
 * **Error hints fit the error.** An error about the request itself (a 4xx other than 401/403, an unknown

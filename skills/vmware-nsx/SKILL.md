@@ -1,11 +1,13 @@
 ---
 name: vmware-nsx
 description: >
-  Use this skill when the user needs to inspect or manage VMware NSX networking through NSX Manager — segments, Tier-0/Tier-1 gateways, NAT, static routes/BGP, and IP pools.
-  Directly handles: list and inspect segments, gateways, NAT rules, routes and IP pools; check transport node, edge cluster and manager health; find a VM's segment. Changes (create/update/delete segments, Tier-1 gateways, NAT rules, static routes, IP pools, Tier-0 BGP) only when the user explicitly asks for that change.
-  Use this skill for "create segment", "set up gateway", "create NAT rule", "check network health", "troubleshoot connectivity" when the context is explicitly NSX, NSX-T, or NSX Manager.
-  Do NOT use for networking outside NSX, DFW firewall rules or security groups (use vmware-nsx-security), vSphere distributed port groups or host VMkernel adapters (use vmware-aiops), VM lifecycle (use vmware-aiops), or AVI/ALB load balancing (use vmware-avi).
-  For multi-step workflows use vmware-pilot.
+  Use for VMware NSX/NSX-T networking: segments, Tier-0/Tier-1 gateways, NAT, BGP, static routes, IP
+  pools, fabric inventory, health and connectivity diagnostics. Trigger on "create segment",
+  "configure gateway", "add NAT rule", "check NSX health" or NSX network troubleshooting. Supporting
+  commands configure the local MCP client; default stdio is local, and opt-in authenticated HTTPS
+  opens a listener. For DFW/security groups use vmware-nsx-security, vSphere port groups/VMkernel
+  adapters or VM lifecycle vmware-aiops, AVI/ALB vmware-avi, and multi-step workflows vmware-pilot. Do
+  not use for networking outside NSX.
 installer:
   kind: uv
   package: vmware-nsx-mgmt
@@ -17,7 +19,7 @@ compatibility: >
   Credentials: Each NSX Manager target requires a per-target password env var in ~/.vmware-nsx/.env following the pattern VMWARE_NSX_<TARGET_NAME_UPPER>_PASSWORD. Username/password session auth only (client-certificate auth is not implemented). Passwords are never logged or echoed.
   Write operations: CLI write commands require double confirmation and support --dry-run. The five MCP delete tools preview by default — without confirm=True they return the blast radius and change nothing, and confirm=True is refused while a blocker remains (attached ports, Tier-1 dependents, allocated IPs) or a read failed. Other MCP write tools execute when called and are audit-logged, so the agent must call them only on the user's explicit request; ~/.vmware/rules.yaml deny rules can block them per environment.
   VMWARE_AUDIT_APPROVED_BY is an optional attestation recorded in the audit row; it is not a gate and does not carry credentials.
-  No webhooks, no outbound network calls, no guest operations. Local only: stdio MCP + NSX Policy API (HTTPS 443).
+  No webhooks or guest operations; outbound API calls go to the configured NSX Manager. Default stdio is local; optional authenticated HTTPS opens a listener. NSX calls go only to the configured NSX API (HTTPS 443).
   SSL bypass: verify_ssl is on by default; trust a private CA via the SSL_CERT_FILE env var; verify_ssl false only for isolated labs with self-signed certs.
   Transitive dependencies: Only vmware-policy (audit/policy). No post-install scripts or background services.
 ---
