@@ -36,10 +36,10 @@ Container examples build a local version-tagged image and run it with `--pull=ne
 
 ```bash
 # Via PyPI
-uv tool install vmware-nsx-mgmt==1.15.2
+uv tool install vmware-nsx-mgmt==1.15.3
 
 # Or pip
-pip install vmware-nsx-mgmt==1.15.2
+pip install vmware-nsx-mgmt==1.15.3
 ```
 
 ### Offline / Air-Gapped Install (from source)
@@ -191,7 +191,7 @@ vmware-nsx doctor
 
 ## MCP Server
 
-**After `uv tool install vmware-nsx-mgmt==1.15.2`, start the MCP server with one command** (v1.5.15+):
+**After `uv tool install vmware-nsx-mgmt==1.15.3`, start the MCP server with one command** (v1.5.15+):
 
 ```bash
 # Recommended — single command, no network re-resolve
@@ -224,7 +224,7 @@ Add to your AI agent's MCP config:
 
 ```bash
 # Run without installing (requires PyPI access each launch)
-uvx --from vmware-nsx-mgmt==1.15.2 vmware-nsx mcp
+uvx --from vmware-nsx-mgmt==1.15.3 vmware-nsx mcp
 
 # Legacy entry point (still works, kept for backward compatibility)
 vmware-nsx-mcp

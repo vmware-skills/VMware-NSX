@@ -55,7 +55,7 @@ VMware NSX networking management — 33 MCP tools for segments, gateways, NAT, r
 ## Quick Install
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.15.2
+uv tool install vmware-nsx-mgmt==1.15.3
 vmware-nsx init      # guided setup: writes config + .env (chmod 600, password grep-safe), then verifies
 vmware-nsx doctor
 ```
@@ -306,7 +306,7 @@ The password environment variable is missing. Variable names follow the pattern 
 ## Setup
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.15.2
+uv tool install vmware-nsx-mgmt==1.15.3
 vmware-nsx init      # writes ~/.vmware-nsx/config.yaml + .env (chmod 600), then verifies
 vmware-nsx doctor
 ```
