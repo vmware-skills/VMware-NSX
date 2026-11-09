@@ -36,10 +36,10 @@ MCP 默认使用本地 stdio。启用可选 HTTPS 后会打开配置的监听端
 
 ```bash
 # 通过 PyPI
-uv tool install vmware-nsx-mgmt==1.15.2
+uv tool install vmware-nsx-mgmt==1.15.3
 
 # 或 pip
-pip install vmware-nsx-mgmt==1.15.2
+pip install vmware-nsx-mgmt==1.15.3
 ```
 
 ### 离线 / 气隙环境安装（从源码）
@@ -259,7 +259,7 @@ vmware-nsx doctor
 
 ## MCP Server
 
-**v1.5.15+ 推荐方式**：完成 `uv tool install vmware-nsx-mgmt==1.15.2` 后，**一条命令启动 MCP**：
+**v1.5.15+ 推荐方式**：完成 `uv tool install vmware-nsx-mgmt==1.15.3` 后，**一条命令启动 MCP**：
 
 ```bash
 # 推荐 — 单命令，无网络依赖
@@ -292,7 +292,7 @@ docker compose up -d
 
 ```bash
 # 不想安装，临时运行（每次需要联网 resolve 依赖）
-uvx --from vmware-nsx-mgmt==1.15.2 vmware-nsx mcp
+uvx --from vmware-nsx-mgmt==1.15.3 vmware-nsx mcp
 
 # 旧 entry point（仍可用，向后兼容）
 vmware-nsx-mcp

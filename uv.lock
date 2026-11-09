@@ -1142,7 +1142,7 @@ wheels = [
 
 [[package]]
 name = "vmware-nsx-mgmt"
-version = "1.15.2"
+version = "1.15.3"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
