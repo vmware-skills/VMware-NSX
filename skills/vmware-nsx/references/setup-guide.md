@@ -79,10 +79,18 @@ default_target: nsx-prod
 Passwords are **never stored in config.yaml**. They must be set as environment variables via the `.env` file.
 
 ```bash
-echo "VMWARE_NSX_NSX_PROD_PASSWORD=your_password" > ~/.vmware-nsx/.env
-echo "VMWARE_NSX_NSX_LAB_PASSWORD=lab_password" >> ~/.vmware-nsx/.env
-chmod 600 ~/.vmware-nsx/.env
+(
+  umask 077
+  set -C  # Refuse existing files; edit an existing .env locally instead
+  cat > ~/.vmware-nsx/.env <<'EOF'
+VMWARE_NSX_NSX_PROD_PASSWORD=REPLACE_IN_LOCAL_EDITOR
+VMWARE_NSX_NSX_LAB_PASSWORD=REPLACE_IN_LOCAL_EDITOR
+EOF
+)
+# Before continuing, edit .env locally; never type live secrets into shell commands.
 ```
+
+This writes placeholders only. Enter passwords or tokens using a local editor after creation; do not paste live credentials into terminal commands, chat or commits. If the file exists, the command refuses to overwrite it; edit the existing file after checking its permissions are `600`.
 
 **Naming convention**: `VMWARE_NSX_<TARGET_NAME_UPPER>_PASSWORD` where `<TARGET_NAME_UPPER>` is the target `name` from config.yaml, uppercased, with hyphens replaced by underscores.
 
@@ -209,14 +217,18 @@ mcpServers:
 docker compose up -d
 ```
 
-Or run manually:
+Or build and run locally from the checked-out release source:
 
 ```bash
-docker run -d \
+docker build -t vmware-nsx:1.15.2 .
+docker run --pull=never -d \
   -v ~/.vmware-nsx:/root/.vmware-nsx:ro \
   -e VMWARE_NSX_CONFIG=/root/.vmware-nsx/config.yaml \
-  vmware-nsx
+  vmware-nsx:1.15.2
 ```
+
+These commands run the image built locally above; `--pull=never` prevents a missing local image from falling back to a registry. The version tag identifies this build, not an immutable digest.
+
 
 ### Password obfuscation at rest
 
@@ -398,7 +410,7 @@ This prevents malicious object names from injecting prompts when the data flows 
 
 ### Transport Security
 
-- The MCP server uses **stdio transport** (local only) — no network listener is opened
+- By default the MCP server uses local **stdio** without a listener. Opt-in HTTPS opens the configured listener and requires TLS plus caller authentication
 - NSX Manager connections use HTTPS on port 443 by default
 - SSL certificate verification is on by default (`verify_ssl: true` when the key is omitted) and can be turned off per target
 - **Production**: keep `verify_ssl: true`. For a private-CA certificate, set the `SSL_CERT_FILE` (PEM bundle) or `SSL_CERT_DIR` environment variable — there is no per-target CA-path setting in config.yaml. Reserve `verify_ssl: false` for isolated labs
