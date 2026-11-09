@@ -1,0 +1,16 @@
+{
+  "name": "vmware-nsx",
+  "version": "1.15.2",
+  "description": "VMware NSX networking management: segments, gateways, NAT, routing, IPAM",
+  "mcpServers": {
+    "vmware-nsx": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "vmware-nsx-mgmt==1.15.2",
+        "vmware-nsx-mcp"
+      ]
+    }
+  }
+}
