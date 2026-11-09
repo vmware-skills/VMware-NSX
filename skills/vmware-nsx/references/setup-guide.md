@@ -14,19 +14,19 @@ Complete setup and security guide for `vmware-nsx`.
 ### Via uv (recommended)
 
 ```bash
-uv tool install vmware-nsx-mgmt==1.15.2
+uv tool install vmware-nsx-mgmt==1.15.3
 ```
 
 ### Via pip
 
 ```bash
-pip install vmware-nsx-mgmt==1.15.2
+pip install vmware-nsx-mgmt==1.15.3
 ```
 
 ### From source
 
 ```bash
-git clone --branch v1.15.2 https://github.com/vmware-skills/VMware-NSX.git
+git clone --branch v1.15.3 https://github.com/vmware-skills/VMware-NSX.git
 cd VMware-NSX
 pip install -e .
 ```
@@ -220,11 +220,11 @@ docker compose up -d
 Or build and run locally from the checked-out release source:
 
 ```bash
-docker build -t vmware-nsx:1.15.2 .
+docker build -t vmware-nsx:1.15.3 .
 docker run --pull=never -d \
   -v ~/.vmware-nsx:/root/.vmware-nsx:ro \
   -e VMWARE_NSX_CONFIG=/root/.vmware-nsx/config.yaml \
-  vmware-nsx:1.15.2
+  vmware-nsx:1.15.3
 ```
 
 These commands run the image built locally above; `--pull=never` prevents a missing local image from falling back to a registry. The version tag identifies this build, not an immutable digest.
