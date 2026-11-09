@@ -137,11 +137,7 @@ targets:
   "mcpServers": {
     "vmware-nsx": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "vmware-nsx-mgmt==1.15.2",
-        "vmware-nsx-mcp"
-      ],
+      "args": ["--from", "vmware-nsx-mgmt==1.15.2", "vmware-nsx-mcp"],
       "env": {
         "VMWARE_NSX_CONFIG": "~/.vmware-nsx/config.yaml"
       }
