@@ -10,7 +10,7 @@ Community-maintained · MIT · Not an official VMware/Broadcom product.
 
 [![18-second illustrative investigation demo](https://raw.githubusercontent.com/vmware-skills/marketplace/main/assets/demos/vmware-skills-en.gif)](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-en.mp4)
 
-Synthetic-data animation, not a live recording. [Watch the narrated family introduction (~2 min)](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-en.mp4)
+Synthetic-data animation, not a live recording. [Watch the AI-narrated family introduction (~2 min)](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-en.mp4)
 
 ## Why use it?
 
@@ -45,4 +45,4 @@ Includes network configuration writes. VMware NSX permissions and local Policy r
 
 Part of [VMware Skills](https://github.com/vmware-skills/marketplace): 15 skills, 14 MCP servers and one shared Policy library. If it helps your work, star the family portal.
 
-[Issues and feedback](https://github.com/vmware-skills/VMware-NSX/issues) · [MIT](LICENSE)
+[Issues and feedback](https://github.com/vmware-skills/VMware-NSX/issues) · [MIT](https://opensource.org/license/mit/)

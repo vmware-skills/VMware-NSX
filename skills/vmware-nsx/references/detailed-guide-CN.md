@@ -509,4 +509,4 @@ VMware Skills 家族包含 14 个 MCP Server 和共享 Policy 库。按职责选
 
 ## 许可证
 
-[MIT](../../../LICENSE)
+[MIT](https://opensource.org/license/mit/)

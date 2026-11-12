@@ -453,4 +453,4 @@ Read-only self-test with your own model and agent host: [model-fit self-test](ht
 
 ## License
 
-[MIT](../../../LICENSE)
+[MIT](https://opensource.org/license/mit/)
