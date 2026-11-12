@@ -1,455 +1,63 @@
 <!-- mcp-name: io.github.vmware-skills/vmware-nsx -->
 
-# VMware NSX
-
-[![PyPI](https://img.shields.io/pypi/v/vmware-nsx-mgmt)](https://pypi.org/project/vmware-nsx-mgmt/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#readme-license)
-
-English | [中文](README-CN.md)
-
-Maintainer: Wei Zhou · [zhouwei008@gmail.com](mailto:zhouwei008@gmail.com)
-
-Community-maintained open-source project; not an official VMware or Broadcom product.
-
-[Overview](#readme-overview) · [Quick Start](#readme-quick-start) · [MCP Configuration](#readme-mcp-configuration) · [Capabilities and Workflows](#readme-capabilities-and-workflows) · [Safety and Audit](#readme-safety-and-audit) · [Troubleshooting](#readme-troubleshooting) · [Companion Skills](#readme-companion-skills) · [Reference](#readme-reference) · [License](#readme-license)
+# VMware-NSX
 
 <a id="readme-overview"></a>
 
-## Overview
+Inspect and manage VMware NSX networking through focused tools.
 
-Runs locally over stdio by default; configure required targets and credentials on your own machine.
+English · [简体中文](README-CN.md)
 
-VMware NSX networking management: segments, gateways, NAT, routing, IPAM — 33 MCP tools, domain-focused.
+Community-maintained · MIT · Not an official VMware/Broadcom product.
 
-> NSX Policy API skill for NSX-T 3.0+ and NSX 4.x.
+[![18-second illustrative investigation demo](https://raw.githubusercontent.com/vmware-skills/marketplace/main/assets/demos/vmware-skills-en.gif)](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-en.mp4)
 
+Synthetic-data animation, not a live recording. [Watch the AI-narrated family introduction (~2 min)](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-en.mp4)
 
-MCP uses local stdio by default. Opt-in HTTPS opens the configured listener and requires TLS plus caller authentication; it is a network service, not a local-only mode. Credential examples create owner-only placeholder files without overwriting existing files; edit secrets locally.
+<a id="readme-capabilities-and-workflows"></a>
 
-Container examples build a local version-tagged image and run it with `--pull=never`, avoiding registry fallback. A local version tag is not an immutable image digest.
+## Why use it?
 
-Full agent instructions: [`skills/vmware-nsx/SKILL.md`](skills/vmware-nsx/SKILL.md).
+- Work with segments, gateways, NAT and IP pools.
+- Inspect BGP, routes and fabric health.
+- Keep configuration actions explicit and auditable.
 
 <a id="readme-quick-start"></a>
 
-## Quick Start
+## Get started
 
-Requires Python `>=3.10` and `uv`.
+Install the published CLI and inspect its commands:
 
-```bash
+```sh
 uv tool install vmware-nsx-mgmt==1.15.3
 vmware-nsx --help
 ```
 
-Target, credential and local data setup: [setup guide](skills/vmware-nsx/references/setup-guide.md).
+Requires uv and Python >=3.10. Configure targets and credentials locally before remote queries. [Setup guide](skills/vmware-nsx/references/setup-guide.md).
 
-<details>
-<summary>Installation and configuration details (including offline setup)</summary>
-
-### Quick Install
-
-```bash
-# Via PyPI
-uv tool install vmware-nsx-mgmt==1.15.3
-
-# Or pip
-pip install vmware-nsx-mgmt==1.15.3
-```
-
-#### Offline / Air-Gapped Install (from source)
-
-This project uses the modern PEP 517 build system (hatchling), so there is **no
-`setup.py`** by design — that is expected, not a missing file. If you cloned the
-source and hit `ERROR: File "setup.py" or "setup.cfg" not found ... editable mode
-currently requires a setuptools-based build`, your `pip` is older than 21.3 and
-cannot do an *editable* (`-e`) install with a non-setuptools backend. Editable
-mode is a developer convenience, not needed to run the tool — do one of:
-
-```bash
-# From the source tree — a normal (non-editable) install builds a wheel:
-pip install .              # NOT  pip install -e .
-
-# ...or upgrade pip first, and editable works too:
-pip install --upgrade pip && pip install -e .
-```
-
-For a **truly air-gapped host**, build the wheels on a connected machine and copy
-them over — the target then needs no network:
-
-```bash
-# On a connected machine, collect this package + its dependencies as wheels:
-pip wheel . -w dist        # → dist/*.whl   (or: uv build, for just this package)
-
-# Copy dist/ to the air-gapped host, then install offline:
-pip install --no-index --find-links dist vmware-nsx-mgmt
-```
-
-
-### Configuration
-
-```bash
-mkdir -p ~/.vmware-nsx
-cp config.example.yaml ~/.vmware-nsx/config.yaml
-# Edit with your NSX Manager credentials
-
-(
-  umask 077
-  set -C  # Refuse existing files; edit an existing .env locally instead
-  cat > ~/.vmware-nsx/.env <<'EOF'
-VMWARE_NSX_NSX_PROD_PASSWORD=REPLACE_IN_LOCAL_EDITOR
-EOF
-)
-# Before continuing, edit .env locally; never type live secrets into shell commands.
-
-# Verify
-vmware-nsx doctor
-```
-
-This writes placeholders only. Enter passwords or tokens using a local editor after creation; do not paste live credentials into terminal commands, chat or commits. If the file exists, the command refuses to overwrite it; edit the existing file after checking its permissions are `600`.
-
-
-</details>
-
-<a id="readme-mcp-configuration"></a>
-
-## MCP Configuration
-
-Copy this configuration into your MCP client's local stdio settings. The client must be able to find `uvx`; the initial package installation requires access to a package index.
-
-```json
-{
-  "mcpServers": {
-    "vmware-nsx": {
-      "command": "uvx",
-      "args": ["--from", "vmware-nsx-mgmt==1.15.3", "vmware-nsx-mcp"],
-      "env": {
-        "VMWARE_NSX_CONFIG": "~/.vmware-nsx/config.yaml"
-      }
-    }
-  }
-}
-```
-
-The following sections retain preinstalled CLI alternatives and product-specific MCP options.
-
-<details>
-<summary>Preinstalled CLI and additional MCP options</summary>
-
-### MCP Server
-
-**After `uv tool install vmware-nsx-mgmt==1.15.3`, start the MCP server with one command** (v1.5.15+):
-
-```bash
-# Recommended — single command, no network re-resolve
-vmware-nsx mcp
-
-# Or via Docker
-docker compose up -d
-```
-
-#### Agent Configuration
-
-Add to your AI agent's MCP config:
-
-```json
-{
-  "mcpServers": {
-    "vmware-nsx": {
-      "command": "vmware-nsx",
-      "args": ["mcp"],
-      "env": {
-        "VMWARE_NSX_CONFIG": "~/.vmware-nsx/config.yaml"
-      }
-    }
-  }
-}
-```
-
-<details>
-<summary>Alternative: uvx (no install) or legacy entry point</summary>
-
-```bash
-# Run without installing (requires PyPI access each launch)
-uvx --from vmware-nsx-mgmt==1.15.3 vmware-nsx mcp
-
-# Legacy entry point (still works, kept for backward compatibility)
-vmware-nsx-mcp
-```
-
-> **Behind a corporate TLS proxy?** uvx may fail with `invalid peer certificate: UnknownIssuer`.
-> Use the recommended `vmware-nsx mcp` form above (no network needed), or set `UV_NATIVE_TLS=true`.
-
-</details>
-
-More agent config templates (Claude Code, Cursor, Goose, Continue, etc.) in [examples/mcp-configs/](examples/mcp-configs/).
-
-
-</details>
-
-<a id="readme-capabilities-and-workflows"></a>
-
-## Capabilities and Workflows
-
-### What This Skill Does
-
-| Category | Tools | Count | Read / Write |
-|----------|-------|:-----:|:------------:|
-| **Segments** | list, get, create, update, delete | 5 | 2R / 3W |
-| **Tier-0 Gateways** | list, get, BGP neighbors, configure BGP | 4 | 3R / 1W |
-| **Tier-1 Gateways** | list, get, create, update, delete | 5 | 2R / 3W |
-| **NAT** | list, create, delete | 3 | 1R / 2W |
-| **Static Routes** | list, create, delete | 3 | 1R / 2W |
-| **IP Pools** | list, usage, create, delete | 4 | 2R / 2W |
-| **Fabric Inventory** | transport zones, transport nodes, edge clusters | 3 | 3R / 0W |
-| **Health & Troubleshooting** | alarms, transport node status, edge cluster status, manager status, port status, VM-to-segment | 6 | 6R / 0W |
-
-**Total**: 33 tools (20 read-only + 13 write)
-
-### Common Workflows
-
-#### Create an App Network (Segment + T1 Gateway + NAT)
-
-1. Create gateway: `vmware-nsx gateway create-t1 app-t1 --edge-cluster edge-cluster-01 --tier0 tier0-gw`
-2. Create segment: `vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24`
-3. Add SNAT: `vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10`
-4. Verify: `vmware-nsx segment list` and `vmware-nsx nat list app-t1`
-
-Use `--dry-run` to preview any write command first.
-
-#### Check Network Health
-
-1. Manager status: `vmware-nsx health manager-status`
-2. Transport nodes: `vmware-nsx health transport-nodes`
-3. Edge clusters: `vmware-nsx health edge-clusters`
-4. Alarms: `vmware-nsx health alarms --severity HIGH` (exact-match filter; query each severity separately)
-
-#### Troubleshoot VM Connectivity
-
-1. Find VM's segment: `vmware-nsx troubleshoot vm-segment <vm-display-name>`
-2. Check port realized state: `vmware-nsx troubleshoot port-status <segment-id>` (all ports on the segment: attachment, realized bindings, transport nodes)
-3. Check routes: `vmware-nsx gateway routes-t1 app-t1`
-4. Check BGP: `vmware-nsx gateway bgp-neighbors tier0-gw`
-
-### MCP Tools (33 — 20 read, 13 write)
-
-| Category | Tools | Type |
-|----------|-------|------|
-| Segments | `list_segments`, `get_segment`, `create_segment`, `update_segment`, `delete_segment` | Read/Write |
-| Tier-0 GW | `list_tier0_gateways`, `get_tier0_gateway`, `get_bgp_neighbors`, `configure_tier0_bgp` | Read/Write |
-| Tier-1 GW | `list_tier1_gateways`, `get_tier1_gateway`, `create_tier1_gateway`, `update_tier1_gateway`, `delete_tier1_gateway` | Read/Write |
-| NAT | `list_nat_rules`, `create_nat_rule`, `delete_nat_rule` | Read/Write |
-| Static Routes | `list_static_routes`, `create_static_route`, `delete_static_route` | Read/Write |
-| IP Pools | `list_ip_pools`, `get_ip_pool_usage`, `create_ip_pool`, `delete_ip_pool` | Read/Write |
-| Fabric | `list_transport_zones`, `list_transport_nodes`, `list_edge_clusters` | Read |
-| Health | `list_nsx_alarms` (per-severity, exact match), `get_transport_node_status`, `get_edge_cluster_status`, `get_nsx_manager_status` | Read |
-| Troubleshoot | `get_logical_port_status` (realized state of all ports on a segment), `get_segment_port_for_vm` (lookup by VM display name) | Read |
-
-Full per-tool endpoints and methods: `skills/vmware-nsx/references/capabilities.md`.
-
-### CLI
-
-```bash
-# Segments
-vmware-nsx segment list
-vmware-nsx segment get app-web-seg
-vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24
-vmware-nsx segment delete app-web-seg
-
-# Gateways
-vmware-nsx gateway list-t0
-vmware-nsx gateway list-t1
-vmware-nsx gateway create-t1 app-t1 --edge-cluster edge-cluster-01 --tier0 tier0-gw
-vmware-nsx gateway bgp-neighbors tier0-gw
-vmware-nsx gateway routes-t1 app-t1
-
-# NAT
-vmware-nsx nat list app-t1
-vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10
-vmware-nsx nat delete-rule --tier1 app-t1 --rule-id rule-01
-
-# Static Routes
-vmware-nsx route list app-t1
-vmware-nsx route create app-t1 --network 192.168.100.0/24 --next-hop 10.10.1.254
-
-# IP Pools
-vmware-nsx ippool list
-vmware-nsx ippool create tep-pool
-vmware-nsx ippool add-subnet tep-pool --start 192.168.100.10 --end 192.168.100.50 --cidr 192.168.100.0/24
-
-# Health & Troubleshooting
-vmware-nsx health alarms --severity HIGH   # exact match: LOW | MEDIUM | HIGH | CRITICAL
-vmware-nsx health transport-nodes
-vmware-nsx health manager-status
-vmware-nsx troubleshoot vm-segment my-vm-01          # VM display name
-vmware-nsx troubleshoot port-status app-web-seg      # segment ID
-
-# Diagnostics
-vmware-nsx doctor
-```
+For Claude Code and other host installation paths, see the [family portal](https://github.com/vmware-skills/marketplace).
 
 <a id="readme-safety-and-audit"></a>
 
-## Safety and Audit
+## Know the boundaries
 
-### Safety
+Includes network configuration writes. VMware NSX permissions and local Policy remain in force; destructive gates do not replace independent authorization.
 
-| Feature | Description |
-|---------|-------------|
-| Read-heavy | 20/33 tools are read-only |
-| Double confirmation | CLI write commands require two prompts |
-| Dry-run mode | All write commands support `--dry-run` preview |
-| MCP delete preview | The five MCP delete tools preview by default: without `confirm=True` they return `blast_radius` (what would be removed, `blockers`, `unmeasured`) and delete nothing. `confirm=True` is refused while a blocker remains or a read failed |
-| Dependency checks | Segment delete refuses while ports are attached; Tier-1 delete refuses, deleting nothing, while segments, NAT rules, static routes, interfaces or VPN / DNS forwarder / LB services still depend on it (`--dry-run` runs the same check). On MCP, IP pool delete refuses while addresses are allocated — Policy ip-allocations, or NSX's `pool_usage` count, which also covers addresses Policy does not list (e.g. TEP pools) — and when `pool_usage` cannot be read. NAT rule and static route deletes have no blockers; their preview shows the rule's match or the route's network and next hops |
-| Input validation | CIDR, IP, VLAN IDs, gateway existence validated |
-| Audit logging | All operations logged to `~/.vmware-nsx/audit.log` |
-| No firewall ops | Cannot create/modify DFW rules or security groups |
-| Credential safety | Passwords only from environment variables |
-| Prompt injection defense | NSX object names sanitized before output |
+<a id="readme-mcp-configuration"></a> <a id="readme-troubleshooting"></a> <a id="readme-reference"></a>
 
-### Remote access (HTTPS) and limiting tools
+## Go deeper
 
-By default `vmware-nsx mcp` speaks stdio to one local client and offers every tool. Two options change that
-(vmware-policy ≥ 1.21.0).
-
-**Serve over HTTPS** so clients on other machines can connect. Every caller needs a bearer token:
-
-```bash
-vmware-audit token create alice          # prints the token once; give it to alice
-vmware-audit token list                  # names only
-vmware-audit token revoke alice          # refused from its next request, no restart
-vmware-nsx mcp --transport https --host 0.0.0.0 --port 8443 \
-    --cert /etc/vmware-mcp/server.pem --key /etc/vmware-mcp/server-key.pem \
-    --public-name mcp.example.com
-```
-
-Connect a client (Claude Code shown; any MCP client that supports streamable HTTP and custom headers works):
-
-```bash
-claude mcp add --transport http vmware-nsx https://mcp.example.com:8443/mcp \
-    --header "Authorization: Bearer $VMWARE_MCP_TOKEN"
-```
-
-```json
-{
-  "mcpServers": {
-    "vmware-nsx": {
-      "type": "http",
-      "url": "https://mcp.example.com:8443/mcp",
-      "headers": { "Authorization": "Bearer ${VMWARE_MCP_TOKEN}" }
-    }
-  }
-}
-```
-
-- The server will not start without a token, refuses Host/Origin values outside `--public-name`, and checks
-  before it binds that unauthenticated requests get 401. Use a certificate your clients trust for those names.
-- Behind a TLS-terminating reverse proxy on the same machine use `--transport http --host 127.0.0.1
-  --public-name mcp.example.com` and pass the `Authorization` header through.
-- Behind a load balancer or gateway on another machine, keep `--transport https` (a self-signed certificate is
-  fine), list in `--public-name` the host name the balancer sends as `Host`, and have it forward `Authorization`.
-  Its health probe can use `GET /healthz`, which needs no token and returns only `{"status": "ok"}`
-  (vmware-policy ≥ 1.23.0).
-- Send `traceparent` or `X-Request-ID` with each request to have it stored on the audit row;
-  `vmware-audit log --correlation-id ID` then finds the calls behind one platform request.
-- The audit log records each caller as `token:<name>`. Calls run side by side, with or without a target: each
-  target keeps up to `VMWARE_MCP_POOL_SIZE` sessions (default 2), and each session is a login on the target. A call
-  that finds them all busy waits at most 300 s for one.
-- **Everyone who can reach the endpoint acts with this server's account.** Tokens identify callers; they grant
-  nothing on the platform. Run one endpoint per privilege level.
-- **Several people or roles on one endpoint:** run `vmware-audit roles enable` once, then give each token a role (`vmware-audit token create NAME --role reader`, or a role in `roles.yaml` naming tools and targets; vmware-policy ≥ 1.24.0). A role limits what the token may call on this endpoint; it cannot grant more than the account has. See vmware-policy's README, "Roles for network callers".
-
-**Offer only read tools, plus the writes you choose:**
-
-```bash
-vmware-nsx mcp --expose read --allow-write create_ip_pool
-# or: VMWARE_NSX_MCP_EXPOSE=read VMWARE_NSX_MCP_ALLOW_WRITE=create_ip_pool vmware-nsx mcp
-```
-
-Tools not offered do not appear in the client's tool list. A bad value or an unknown write tool stops the server
-(exit 2). This limits what clients are offered; it is not authorization, so the account itself should be
-least-privilege.
-
-Details: `skills/vmware-nsx/references/setup-guide.md` ("Serving MCP over HTTPS", "Limiting which tools are offered").
-
-<a id="readme-troubleshooting"></a>
-
-## Troubleshooting
-
-### Troubleshooting
-
-| Problem | Cause & Fix |
-|---------|-------------|
-| "Segment not found" | Policy API uses segment `id`, not `display_name`. Run `segment list` to get the exact ID. |
-| NAT creation fails "gateway not found" | NAT requires a Tier-1 (or Tier-0) gateway. Verify with `gateway list-t1`. Gateway must have an edge cluster. |
-| BGP neighbor stuck in Connect/Active | Peer unreachable, ASN mismatch, TCP 179 blocked, or MD5 password mismatch. |
-| Transport node "degraded" | TEP unreachable (check MTU >= 1600), NTP sync issues, or host switch config mismatch. |
-| "Password not found" | Variable naming: `VMWARE_NSX_<TARGET_UPPER>_PASSWORD` (hyphens to underscores). Check `~/.vmware-nsx/.env`. |
-| Connection timeout | Use `vmware-nsx doctor --skip-auth` to bypass auth checks on high-latency networks. |
-
-<!-- usage: remote-and-exposure -->
-
-### System proxy bypass
-
-The NSX Manager REST client honors the operating system proxy bypass list for the configured origin.
-TLS verification still follows `verify_ssl`, and CA environment settings such as `SSL_CERT_FILE` remain active.
-Other origins retain their normal proxy routing.
+- [Capabilities](skills/vmware-nsx/references/capabilities.md)
+- [CLI reference](skills/vmware-nsx/references/cli-reference.md)
+- [Agent guardrails](skills/vmware-nsx/references/agent-guardrails.md)
+- [Detailed usage and architecture](skills/vmware-nsx/references/detailed-guide.md)
+- [MCP launch configuration](.mcp.json)
+- [Canonical skill instructions](skills/vmware-nsx/SKILL.md)
 
 <a id="readme-companion-skills"></a>
 
-## Companion Skills
-
-The VMware Skills family contains 14 MCP servers and the shared Policy library. Choose tools by responsibility: [vmware-skills](https://github.com/vmware-skills).
-
-### Companion Skills
-
-| Skill | Scope | Tools | Install |
-|-------|-------|:-----:|---------|
-| **[vmware-aiops](https://github.com/vmware-skills/VMware-AIops)** ⭐ entry point | VM lifecycle, deployment, guest ops, clusters | 49 | `uv tool install vmware-aiops` |
-| **[vmware-monitor](https://github.com/vmware-skills/VMware-Monitor)** | Read-only monitoring, alarms, events, VM info | 27 | `uv tool install vmware-monitor` |
-| **[vmware-storage](https://github.com/vmware-skills/VMware-Storage)** | Datastores, iSCSI, vSAN | 11 | `uv tool install vmware-storage` |
-| **[vmware-vks](https://github.com/vmware-skills/VMware-VKS)** | Tanzu Namespaces, TKC cluster lifecycle | 20 | `uv tool install vmware-vks` |
-| **[vmware-nsx-security](https://github.com/vmware-skills/VMware-NSX-Security)** | DFW microsegmentation, security groups, Traceflow | 21 | `uv tool install vmware-nsx-security` |
-| **[vmware-aria](https://github.com/vmware-skills/VMware-Aria)** | Aria Ops metrics, alerts, capacity planning | 28 | `uv tool install vmware-aria` |
-| **[vmware-avi](https://github.com/vmware-skills/VMware-AVI)** | AVI/NSX ALB load balancing, AKO | 28 | `uv tool install vmware-avi` |
-| **[vmware-harden](https://github.com/vmware-skills/VMware-Harden)** | Compliance baselines, drift detection | 6 | `uv tool install vmware-harden` |
-
-<a id="readme-reference"></a>
-
-## Reference
-
-Release history: [RELEASE_NOTES.md](RELEASE_NOTES.md).
-
-Read-only self-test with your own model and agent host: [model-fit self-test](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md).
-
-### Version Compatibility
-
-| NSX Version | Support | Notes |
-|-------------|---------|-------|
-| NSX 9.1 | Full | Policy API supported. Note: VDS 7.0+ required (N-VDS removed in NSX 9). |
-| NSX 9.0 | Full | Policy API supported. Note: bare-metal agent / physical-server L2 overlay removed. |
-| NSX 4.x | Full | Latest Policy API, all features |
-| NSX-T 3.2 | Full | All features work |
-| NSX-T 3.1 | Full | Minor route table format differences |
-| NSX-T 3.0 | Compatible | IP pool subnet API introduced here |
-| NSX-T 2.5 | Limited | Policy API incomplete; some tools may fail |
-| NSX-V (6.x) | Not supported | Different API (SOAP-based) |
-
-#### VCF Compatibility
-
-| VCF Version | Bundled NSX | Support |
-|-------------|-------------|---------|
-| VCF 9.1 | NSX 9.1 | Full |
-| VCF 9.0 | NSX 9.0 | Full |
-| VCF 5.x | NSX 4.x | Full |
-| VCF 4.3-4.5 | NSX-T 3.1-3.2 | Full |
-
-##### Official Broadcom References
-
-- **SDKs**: <https://developer.broadcom.com/sdks> — VMware NSX for Python SDK (official; future migration target), VCF Python SDK
-- **REST APIs**: <https://developer.broadcom.com/xapis> — NSX-T Data Center REST API (this skill uses the Policy API subset)
-- **CLI Tools**: <https://developer.broadcom.com/tools> — VCF PowerCLI 9.1 (includes NSX cmdlets)
+Part of [VMware Skills](https://github.com/vmware-skills/marketplace): 15 skills, 14 MCP servers and one shared Policy library. If it helps your work, star the family portal.
 
 <a id="readme-license"></a>
 
-## License
-
-[MIT](LICENSE)
+[Issues and feedback](https://github.com/vmware-skills/VMware-NSX/issues) · [MIT](https://opensource.org/license/mit/)

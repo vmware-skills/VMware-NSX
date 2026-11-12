@@ -1,511 +1,63 @@
 <!-- mcp-name: io.github.vmware-skills/vmware-nsx -->
 
-# VMware NSX
-
-[![PyPI](https://img.shields.io/pypi/v/vmware-nsx-mgmt)](https://pypi.org/project/vmware-nsx-mgmt/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#readme-license)
-
-[English](README.md) | 中文
-
-维护者: Wei Zhou · [zhouwei008@gmail.com](mailto:zhouwei008@gmail.com)
-
-社区维护的开源项目，非 VMware 或 Broadcom 官方产品。
-
-[概述](#readme-overview) · [快速开始](#readme-quick-start) · [MCP 配置](#readme-mcp-configuration) · [能力与工作流](#readme-capabilities-and-workflows) · [安全与审计](#readme-safety-and-audit) · [故障排查](#readme-troubleshooting) · [配套 Skills](#readme-companion-skills) · [参考资料](#readme-reference) · [许可证](#readme-license)
+# VMware-NSX
 
 <a id="readme-overview"></a>
 
-## 概述
+通过专业工具调查和管理 VMware NSX 网络。
 
-默认通过本地 Stdio 运行；请在本机配置所需目标和凭据。
+[English](README.md) · 简体中文
 
-VMware NSX 网络管理：Segment、网关、NAT、路由、IPAM — 33 个 MCP 工具，领域专注。
+社区维护 · MIT 开源 · 非 VMware/Broadcom 官方产品。
 
-> 基于 NSX Policy API，支持 NSX-T 3.0+ 和 NSX 4.x。
+[![18 秒调查示意演示](https://raw.githubusercontent.com/vmware-skills/marketplace/main/assets/demos/vmware-skills-zh.gif)](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-zh.mp4)
 
+使用合成数据的示意动画，非实时录屏。[观看家族 AI 配音介绍（约 2 分钟）](https://github.com/vmware-skills/marketplace/blob/main/assets/demos/vmware-skills-zh.mp4)
 
-MCP 默认使用本地 stdio。启用可选 HTTPS 后会打开配置的监听端口，并要求 TLS 与调用者认证；此时属于网络服务。凭据示例先创建仅当前用户可读写的占位文件，拒绝覆盖已有文件，再由用户在本地编辑秘密值。
+<a id="readme-capabilities-and-workflows"></a>
 
-容器示例先在本地构建带版本标签的镜像，再用 `--pull=never` 运行，避免回退到镜像仓库拉取。本地版本标签不等于不可变的镜像摘要。
+## 能解决什么问题？
 
-完整的 Agent 指令见 [`skills/vmware-nsx/SKILL.md`](skills/vmware-nsx/SKILL.md).
+- 处理网段、网关、NAT 与 IP 地址池。
+- 检查 BGP、路由与 Fabric 健康。
+- 让配置操作明确且可审计。
 
 <a id="readme-quick-start"></a>
 
 ## 快速开始
 
-需要 Python `>=3.10` 和 `uv`。
+安装已发布 CLI，并查看可用命令：
 
-```bash
+```sh
 uv tool install vmware-nsx-mgmt==1.15.3
 vmware-nsx --help
 ```
 
-目标、凭据和本地数据目录设置见 [setup guide](skills/vmware-nsx/references/setup-guide.md).
+需要 uv 与 Python >=3.10。远程查询前，在本地配置目标与凭据。[配置指南](skills/vmware-nsx/references/setup-guide.md)。
 
-<details>
-<summary>安装与配置详情（含离线安装）</summary>
-
-### 快速安装
-
-```bash
-# 通过 PyPI
-uv tool install vmware-nsx-mgmt==1.15.3
-
-# 或 pip
-pip install vmware-nsx-mgmt==1.15.3
-```
-
-#### 离线 / 气隙环境安装（从源码）
-
-本项目采用现代 PEP 517 构建系统（hatchling），因此**没有 `setup.py`**——这是设计
-使然，不是文件缺失。如果你克隆源码后遇到 `ERROR: File "setup.py" or "setup.cfg" not
-found ... editable mode currently requires a setuptools-based build`，说明你的 `pip`
-版本低于 21.3，无法对非 setuptools 后端做*可编辑*（`-e`）安装。可编辑模式只是开发
-便利，运行本工具并不需要它——任选其一：
-
-```bash
-# 在源码目录下——普通（非可编辑）安装会构建 wheel：
-pip install .              # 不是  pip install -e .
-
-# ……或先升级 pip，可编辑安装也能用：
-pip install --upgrade pip && pip install -e .
-```
-
-对于**完全气隙的主机**，在联网机器上构建 wheel 再拷贝过去——目标机无需联网：
-
-```bash
-# 在联网机器上，把本包及其依赖收集为 wheel：
-pip wheel . -w dist        # → dist/*.whl  （或：uv build，仅构建本包）
-
-# 把 dist/ 拷到气隙主机，离线安装：
-pip install --no-index --find-links dist vmware-nsx-mgmt
-```
-
-
-### 配置
-
-```bash
-mkdir -p ~/.vmware-nsx
-cp config.example.yaml ~/.vmware-nsx/config.yaml
-# 编辑 config.yaml，填入 NSX Manager 地址和用户名
-
-(
-  umask 077
-  set -C  # 拒绝覆盖已有文件；已有 .env 请直接用本地编辑器修改
-  cat > ~/.vmware-nsx/.env <<'EOF'
-VMWARE_NSX_NSX_PROD_PASSWORD=REPLACE_IN_LOCAL_EDITOR
-EOF
-)
-# 继续前，先用本地编辑器填写 .env；不要在终端命令中输入真实秘密值。
-
-# 验证环境
-vmware-nsx doctor
-```
-
-模板只写入占位符。创建后用本地编辑器填写密码或令牌；不要把真实凭据粘贴到终端命令、聊天或提交中。若文件已存在，上述命令会拒绝覆盖；直接编辑现有文件并先确认权限为 `600`。
-
-#### config.yaml 示例
-
-```yaml
-default_target: nsx-prod
-targets:
-  nsx-prod:
-    host: nsx-mgr.example.com    # NSX Manager IP 或集群 VIP
-    username: admin
-  nsx-lab:
-    host: 10.0.0.100
-    username: admin
-```
-
-密码不写在 config.yaml 里，按目标名从环境变量读取（`nsx-prod` →
-`VMWARE_NSX_NSX_PROD_PASSWORD`，`nsx-lab` → `VMWARE_NSX_NSX_LAB_PASSWORD`），
-或放进 `~/.vmware-nsx/.env`。上面的 `username` 同样可以被
-`VMWARE_NSX_NSX_PROD_USERNAME` / `VMWARE_NSX_NSX_LAB_USERNAME` 覆盖，
-两者在每次连接时一起读取，便于从密钥管理系统整对轮换。
-
-
-</details>
-
-<a id="readme-mcp-configuration"></a>
-
-## MCP 配置
-
-将以下配置复制到 MCP 客户端的本地 Stdio 配置中。客户端需要能找到 `uvx`；首次安装所需包时需要访问包源。
-
-```json
-{
-  "mcpServers": {
-    "vmware-nsx": {
-      "command": "uvx",
-      "args": ["--from", "vmware-nsx-mgmt==1.15.3", "vmware-nsx-mcp"],
-      "env": {
-        "VMWARE_NSX_CONFIG": "~/.vmware-nsx/config.yaml"
-      }
-    }
-  }
-}
-```
-
-以下保留预先安装 CLI 的用法及各工具特有的 MCP 选项。
-
-<details>
-<summary>预先安装的 CLI 与其他 MCP 选项</summary>
-
-### MCP Server
-
-**v1.5.15+ 推荐方式**：完成 `uv tool install vmware-nsx-mgmt==1.15.3` 后，**一条命令启动 MCP**：
-
-```bash
-# 推荐 — 单命令，无网络依赖
-vmware-nsx mcp
-
-# 或通过 Docker
-docker compose up -d
-```
-
-#### Agent 配置
-
-将以下内容添加到 AI Agent 的 MCP 配置文件：
-
-```json
-{
-  "mcpServers": {
-    "vmware-nsx": {
-      "command": "vmware-nsx",
-      "args": ["mcp"],
-      "env": {
-        "VMWARE_NSX_CONFIG": "~/.vmware-nsx/config.yaml"
-      }
-    }
-  }
-}
-```
-
-<details>
-<summary>备选方案：uvx（不安装）或 legacy 入口</summary>
-
-```bash
-# 不想安装，临时运行（每次需要联网 resolve 依赖）
-uvx --from vmware-nsx-mgmt==1.15.3 vmware-nsx mcp
-
-# 旧 entry point（仍可用，向后兼容）
-vmware-nsx-mcp
-```
-
-> **公司 TLS 代理网络下？** uvx 可能报 `invalid peer certificate: UnknownIssuer`。
-> 推荐使用上面的 `vmware-nsx mcp`（无需联网），或 `export UV_NATIVE_TLS=true`。
-
-</details>
-
-更多 Agent 配置模板（Claude Code、Cursor、Goose、Continue 等）见 [examples/mcp-configs/](examples/mcp-configs/)。
-
-
-</details>
-
-<a id="readme-capabilities-and-workflows"></a>
-
-## 能力与工作流
-
-### 功能概览
-
-| 类别 | 工具 | 数量 | 读 / 写 |
-|------|------|:----:|:------:|
-| **Segment** | 列表、详情、创建、更新、删除 | 5 | 2 读 / 3 写 |
-| **Tier-0 网关** | 列表、详情、BGP 邻居、配置 BGP | 4 | 3 读 / 1 写 |
-| **Tier-1 网关** | 列表、详情、创建、更新、删除 | 5 | 2 读 / 3 写 |
-| **NAT** | 列表、创建、删除 | 3 | 1 读 / 2 写 |
-| **静态路由** | 列表、创建、删除 | 3 | 1 读 / 2 写 |
-| **IP 池** | 列表、使用情况、创建池、删除池 | 4 | 2 读 / 2 写 |
-| **Fabric 清单** | 传输区域、传输节点、Edge 集群 | 3 | 3 读 / 0 写 |
-| **健康与排障** | 告警、传输节点状态、Edge 集群状态、Manager 状态、逻辑端口状态、VM 所在 Segment | 6 | 6 读 / 0 写 |
-
-**合计**：33 个工具（20 只读 + 13 写）
-
-### MCP 工具（33 个 —— 20 读 / 13 写）
-
-| 类别 | 工具 | 类型 |
-|------|------|------|
-| Segment | `list_segments`、`get_segment`、`create_segment`、`update_segment`、`delete_segment` | 读/写 |
-| Tier-0 网关 | `list_tier0_gateways`、`get_tier0_gateway`、`get_bgp_neighbors`、`configure_tier0_bgp` | 读/写 |
-| Tier-1 网关 | `list_tier1_gateways`、`get_tier1_gateway`、`create_tier1_gateway`、`update_tier1_gateway`、`delete_tier1_gateway` | 读/写 |
-| NAT | `list_nat_rules`、`create_nat_rule`、`delete_nat_rule` | 读/写 |
-| 静态路由 | `list_static_routes`、`create_static_route`、`delete_static_route` | 读/写 |
-| IP 池 | `list_ip_pools`、`get_ip_pool_usage`、`create_ip_pool`、`delete_ip_pool` | 读/写 |
-| Fabric 清单 | `list_transport_zones`、`list_transport_nodes`、`list_edge_clusters` | 只读 |
-| 健康 | `list_nsx_alarms`（按单一 severity 精确过滤）、`get_transport_node_status`、`get_edge_cluster_status`、`get_nsx_manager_status` | 只读 |
-| 排障 | `get_logical_port_status`（按 Segment 查看全部端口实现状态）、`get_segment_port_for_vm`（按 VM 显示名查找） | 只读 |
-
-每个工具的完整 API 端点与方法见 `skills/vmware-nsx/references/capabilities.md`。
-
-#### 工具说明
-
-**Segment**
-- `list_segments` — 列出所有 Segment，含类型、子网、网关、传输区域
-- `get_segment` — 获取 Segment 详情，含端口和子网配置
-- `create_segment` — 创建 Overlay 或 VLAN Segment
-- `update_segment` — 更新 Segment 属性（描述、标签、DHCP）
-- `delete_segment` — 删除 Segment（检查已连接端口）
-
-**Tier-0 网关**
-- `list_tier0_gateways` — 列出所有 Tier-0 网关，含 HA 模式和 transit 子网
-- `get_tier0_gateway` — 获取 Tier-0 详情：HA 模式、故障切换、transit 子网
-- `get_bgp_neighbors` — 获取 Tier-0 的 BGP 配置与邻居会话状态
-- `configure_tier0_bgp` — 在 Tier-0 的 locale-service 上配置 BGP（local AS、ECMP、inter-SR iBGP）
-
-**Tier-1 网关**
-- `list_tier1_gateways` — 列出所有 Tier-1 网关，含关联的 Tier-0 与路由通告
-- `get_tier1_gateway` — 获取 Tier-1 详情：Tier-0 链路、路由通告
-- `create_tier1_gateway` — 创建 Tier-1 网关并关联 Edge 集群和 Tier-0
-- `update_tier1_gateway` — 更新 Tier-1 属性（路由通告、Tier-0 链路）
-- `delete_tier1_gateway` — 删除 Tier-1 网关；先做只读预检，仍有 segment、NAT 规则、静态路由、服务接口、其他 locale-service、IPsec / L2 VPN 服务、DNS 转发器或负载均衡服务依赖它时拒绝删除、不做任何改动，并列出阻塞对象的 ID
-
-**NAT**（仅 Tier-1）
-- `list_nat_rules` — 列出 Tier-1 网关上的 NAT 规则
-- `create_nat_rule` — 创建 SNAT/DNAT/反射 NAT 规则（同 `rule_id` 重发即为更新）
-- `delete_nat_rule` — 删除 NAT 规则
-
-**静态路由**（Tier-0 / Tier-1）
-- `list_static_routes` — 列出网关上的静态路由
-- `create_static_route` — 添加静态路由
-- `delete_static_route` — 删除静态路由
-
-**IP 池**
-- `list_ip_pools` — 列出 IP 地址池及使用统计
-- `get_ip_pool_usage` — 查看单个池的已分配 IP
-- `create_ip_pool` — 创建 IP 地址池（含一个静态子网与分配范围）
-- `delete_ip_pool` — 永久删除 IP 地址池
-
-**Fabric 清单**
-- `list_transport_zones` — 列出传输区域（OVERLAY / VLAN）
-- `list_transport_nodes` — 列出传输节点及类型、状态
-- `list_edge_clusters` — 列出 Edge 集群及成员数、部署类型
-
-**健康与排障**
-- `list_nsx_alarms` — 列出指定 severity 的活跃 NSX 告警（精确匹配，非"及以上"；需逐档查询）
-- `get_transport_node_status` — 传输节点连接状态、隧道/pNIC 计数
-- `get_edge_cluster_status` — Edge 集群成员状态
-- `get_nsx_manager_status` — NSX Manager 集群健康状态
-- `get_logical_port_status` — 按 Segment 查看全部端口的实现状态（attachment、realized bindings、传输节点）
-- `get_segment_port_for_vm` — 按 VM 显示名查找其连接的 Segment（经 /fabric/vifs）
-
-### 常见工作流
-
-#### 创建应用网络（Segment + T1 网关 + NAT）
-
-1. 创建网关：`vmware-nsx gateway create-t1 app-t1 --edge-cluster edge-cluster-01 --tier0 tier0-gw`
-2. 创建 Segment：`vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24`
-3. 添加 SNAT：`vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10`
-4. 验证：`vmware-nsx segment list` 和 `vmware-nsx nat list app-t1`
-
-任何写操作前可加 `--dry-run` 预览。
-
-#### 检查网络健康
-
-1. Manager 状态：`vmware-nsx health manager-status`
-2. 传输节点：`vmware-nsx health transport-nodes`
-3. Edge 集群：`vmware-nsx health edge-clusters`
-4. 告警：`vmware-nsx health alarms --severity HIGH`（精确匹配单一级别，需逐档查询）
-
-#### 排查 VM 连通性
-
-1. 查找 VM 所在 Segment：`vmware-nsx troubleshoot vm-segment <vm-display-name>`
-2. 检查端口实现状态：`vmware-nsx troubleshoot port-status <segment-id>`（该 Segment 全部端口的 attachment / realized bindings / 传输节点）
-3. 检查路由：`vmware-nsx gateway routes-t1 app-t1`
-4. 检查 BGP：`vmware-nsx gateway bgp-neighbors tier0-gw`
-
-### CLI
-
-```bash
-# Segment
-vmware-nsx segment list
-vmware-nsx segment get app-web-seg
-vmware-nsx segment create app-web-seg --name app-web-seg --tz <tz-overlay-path> --subnet 10.10.1.1/24
-vmware-nsx segment delete app-web-seg
-
-# 网关
-vmware-nsx gateway list-t0
-vmware-nsx gateway list-t1
-vmware-nsx gateway create-t1 app-t1 --edge-cluster edge-cluster-01 --tier0 tier0-gw
-vmware-nsx gateway bgp-neighbors tier0-gw
-vmware-nsx gateway routes-t1 app-t1
-
-# NAT（写操作有双重确认 + --dry-run 预览）
-vmware-nsx nat list app-t1
-vmware-nsx nat create app-t1 --action SNAT --source 10.10.1.0/24 --translated 172.16.0.10
-vmware-nsx nat delete-rule --tier1 app-t1 --rule-id rule-01
-
-# 静态路由
-vmware-nsx route list app-t1
-vmware-nsx route create app-t1 --network 192.168.100.0/24 --next-hop 10.10.1.254
-
-# IP 池
-vmware-nsx ippool list
-vmware-nsx ippool create tep-pool
-vmware-nsx ippool add-subnet tep-pool --start 192.168.100.10 --end 192.168.100.50 --cidr 192.168.100.0/24
-
-# 健康与排障
-vmware-nsx health alarms --severity HIGH   # 精确匹配：LOW | MEDIUM | HIGH | CRITICAL
-vmware-nsx health transport-nodes
-vmware-nsx health manager-status
-vmware-nsx troubleshoot vm-segment my-vm-01          # VM 显示名
-vmware-nsx troubleshoot port-status app-web-seg      # Segment ID
-
-# 环境诊断
-vmware-nsx doctor
-```
+Claude Code 及其他宿主安装方式见[家族门户](https://github.com/vmware-skills/marketplace/blob/main/README-CN.md)。
 
 <a id="readme-safety-and-audit"></a>
 
-## 安全与审计
+## 使用边界
 
-### 安全
+包含网络配置写操作。NSX 权限与本地 Policy 继续生效；破坏性操作确认门不替代独立授权。
 
-| 功能 | 说明 |
-|------|------|
-| 只读为主 | 33 个工具中 20 个只读 |
-| 双重确认 | CLI 写操作需两次确认 |
-| --dry-run | 所有写操作支持预览模式 |
-| MCP 删除预览 | 五个 MCP 删除工具默认只预览：不传 `confirm=True` 时返回 `blast_radius`（将删除什么、`blockers`、`unmeasured`），不删除任何东西。仍有阻塞项或有读取失败时，`confirm=True` 会被拒绝 |
-| 依赖检查 | 删除 segment 时若仍有端口连接则拒绝；删除 Tier-1 时若仍有 segment、NAT 规则、静态路由、接口或 VPN / DNS 转发器 / 负载均衡服务依赖它则拒绝，且不做任何改动（`--dry-run` 执行同样的检查）。通过 MCP 删除 IP 池时，若仍有已分配地址则拒绝——包括 Policy ip-allocations，以及 NSX `pool_usage` 的计数（它也涵盖 Policy 不列出的地址，如 TEP 池）；`pool_usage` 无法读取时同样拒绝。NAT 规则与静态路由的删除没有阻塞项；其预览显示规则的匹配条件，或路由的目标网段与下一跳 |
-| 输入验证 | CIDR、IP、VLAN ID、网关存在性验证 |
-| 审计日志 | 所有操作记录到 `~/.vmware-nsx/audit.log`（JSON Lines） |
-| 无防火墙操作 | 无法创建/修改 DFW 规则或安全组 |
-| 凭据安全 | 密码只从环境变量读取，不存于配置文件 |
-| Prompt 注入防护 | NSX 对象名称经过控制字符清理 |
-| TLS 说明 | 默认对自签名证书禁用 TLS 验证；生产环境建议启用 |
+<a id="readme-mcp-configuration"></a> <a id="readme-troubleshooting"></a> <a id="readme-reference"></a>
 
-### 远程访问（HTTPS）与限制工具
+## 详细文档
 
-默认情况下 `vmware-nsx mcp` 通过 stdio 服务一个本地客户端，并提供全部工具。以下两个选项可以改变这一点
-（需 vmware-policy ≥ 1.21.0）。
-
-**通过 HTTPS 提供服务**，让其他机器上的客户端连接。每个调用者都需要一个 bearer token：
-
-```bash
-vmware-audit token create alice          # 只显示一次，交给 alice
-vmware-audit token list                  # 只列名字
-vmware-audit token revoke alice          # 下一个请求起即拒绝，无需重启
-vmware-nsx mcp --transport https --host 0.0.0.0 --port 8443 \
-    --cert /etc/vmware-mcp/server.pem --key /etc/vmware-mcp/server-key.pem \
-    --public-name mcp.example.com
-```
-
-连接客户端（以 Claude Code 为例；任何支持 streamable HTTP 和自定义请求头的 MCP 客户端都可以）：
-
-```bash
-claude mcp add --transport http vmware-nsx https://mcp.example.com:8443/mcp \
-    --header "Authorization: Bearer $VMWARE_MCP_TOKEN"
-```
-
-```json
-{
-  "mcpServers": {
-    "vmware-nsx": {
-      "type": "http",
-      "url": "https://mcp.example.com:8443/mcp",
-      "headers": { "Authorization": "Bearer ${VMWARE_MCP_TOKEN}" }
-    }
-  }
-}
-```
-
-- 没有 token 时服务不会启动；`--public-name` 之外的 Host/Origin 一律拒绝；绑定端口前会自检，确认未认证请求得到 401。
-  证书要用客户端信任、且覆盖这些名字的证书。
-- 在同一台机器上由反向代理终结 TLS 时，用 `--transport http --host 127.0.0.1 --public-name mcp.example.com`，
-  并让代理透传 `Authorization` 头。
-- 负载均衡或网关在另一台机器上时，保持 `--transport https`（自签证书也可以），在 `--public-name` 里写上负载均衡
-  转发时带的 `Host` 名，并让它透传 `Authorization`。健康检查可以用 `GET /healthz`：不需要 token，只返回
-  `{"status": "ok"}`（需 vmware-policy ≥ 1.23.0）。
-- 每个请求带上 `traceparent` 或 `X-Request-ID`，它会记进审计记录；用 `vmware-audit log --correlation-id ID`
-  就能查到平台上某一次请求对应的调用。
-- 审计日志把每个调用者记为 `token:<名字>`。无论是否指定 target，调用都并行执行：每个 target 最多保持
-  `VMWARE_MCP_POOL_SIZE` 个会话（默认 2），每个会话都是在该 target 上的一次登录。会话全被占用时，
-  调用最多等待 300 秒。
-- **能连到这个端点的人，都以该 server 配置的账号操作。** token 只用来识别调用者，不在平台上授予任何权限。
-  每个权限级别单独起一个端点。
-- **一个端点给多人或多种角色用：** 先运行一次 `vmware-audit roles enable`，再给每个 token 指定角色（`vmware-audit token create 名字 --role reader`，或在 `roles.yaml` 里定义可用的工具和 target；需 vmware-policy ≥ 1.24.0）。角色只能限定这个 token 在本端点上能调用什么，不能超出账号本身的权限。详见 vmware-policy README 的「网络调用者的角色」一节。
-
-**只提供读工具，加上你选定的写工具：**
-
-```bash
-vmware-nsx mcp --expose read --allow-write create_ip_pool
-# 或：VMWARE_NSX_MCP_EXPOSE=read VMWARE_NSX_MCP_ALLOW_WRITE=create_ip_pool vmware-nsx mcp
-```
-
-未提供的工具不会出现在客户端的工具列表里。取值错误或写工具名不存在时服务直接退出（exit 2）。
-这只限制提供给客户端的工具，不是授权；账号本身仍应遵循最小权限。
-
-详见 `skills/vmware-nsx/references/setup-guide.md`（"Serving MCP over HTTPS"、"Limiting which tools are offered"）。
-
-<a id="readme-troubleshooting"></a>
-
-## 故障排查
-
-### 常见问题排查
-
-| 问题 | 原因与解决 |
-|------|-----------|
-| "Segment not found" | Policy API 使用 Segment `id` 而非 `display_name`。运行 `segment list` 获取准确 ID。 |
-| NAT 创建报 "gateway not found" | NAT 需要 Tier-1（或 Tier-0）网关。用 `gateway list-t1` 确认，网关必须有 Edge 集群。 |
-| BGP 邻居停在 Connect/Active | 对端不可达、ASN 不匹配、TCP 179 被阻止、或 MD5 密码不匹配。 |
-| 传输节点 "degraded" | TEP 不可达（检查 MTU >= 1600）、NTP 同步问题、或主机交换机配置不匹配。 |
-| "Password not found" 错误 | 变量名规则：`VMWARE_NSX_<目标名大写>_PASSWORD`（连字符→下划线）。检查 `~/.vmware-nsx/.env`。 |
-| 连接 NSX Manager 超时 | 使用 `vmware-nsx doctor --skip-auth` 跳过高延迟网络的认证检查。 |
-
-<!-- usage: remote-and-exposure -->
-
-### 系统代理绕过
-
-NSX Manager REST 客户端按操作系统的代理绕过列表直连配置的目标地址。
-TLS 校验仍由 `verify_ssl` 控制，`SSL_CERT_FILE` 等 CA 环境设置继续生效；其他地址保留原有代理路由。
+- [能力范围](skills/vmware-nsx/references/capabilities.md)
+- [CLI 用法](skills/vmware-nsx/references/cli-reference.md)
+- [Agent 使用约束](skills/vmware-nsx/references/agent-guardrails.md)
+- [详细用法与架构](skills/vmware-nsx/references/detailed-guide-CN.md)
+- [MCP 启动配置](.mcp.json)
+- [唯一技能指令正本](skills/vmware-nsx/SKILL.md)
 
 <a id="readme-companion-skills"></a>
 
-## 配套 Skills
-
-VMware Skills 家族包含 14 个 MCP Server 和共享 Policy 库。按职责选择工具： [vmware-skills](https://github.com/vmware-skills).
-
-### 伴生 Skills
-
-| Skill | 范围 | 工具数 | 安装 |
-|-------|------|:-----:|------|
-| **[vmware-aiops](https://github.com/vmware-skills/VMware-AIops)** ⭐ 入口 | VM 生命周期、部署、Guest Ops、集群 | 49 | `uv tool install vmware-aiops` |
-| **[vmware-monitor](https://github.com/vmware-skills/VMware-Monitor)** | 只读监控、告警、事件、VM 信息 | 27 | `uv tool install vmware-monitor` |
-| **[vmware-storage](https://github.com/vmware-skills/VMware-Storage)** | 数据存储、iSCSI、vSAN | 11 | `uv tool install vmware-storage` |
-| **[vmware-vks](https://github.com/vmware-skills/VMware-VKS)** | Tanzu 命名空间、TKC 集群生命周期 | 20 | `uv tool install vmware-vks` |
-| **[vmware-nsx-security](https://github.com/vmware-skills/VMware-NSX-Security)** | DFW 微分段、安全组、Traceflow | 21 | `uv tool install vmware-nsx-security` |
-| **[vmware-aria](https://github.com/vmware-skills/VMware-Aria)** | Aria Ops 指标、告警、容量规划 | 28 | `uv tool install vmware-aria` |
-| **[vmware-avi](https://github.com/vmware-skills/VMware-AVI)** | AVI/NSX ALB 负载均衡、AKO | 28 | `uv tool install vmware-avi` |
-| **[vmware-harden](https://github.com/vmware-skills/VMware-Harden)** | 合规基线、Drift 检测 | 6 | `uv tool install vmware-harden` |
-
-<a id="readme-reference"></a>
-
-## 参考资料
-
-变更记录： [RELEASE_NOTES.md](RELEASE_NOTES.md).
-
-使用自己的模型和 Agent 宿主进行只读自测： [model-fit self-test](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md).
-
-### 版本兼容性
-
-| NSX 版本 | 支持 | 说明 |
-|----------|------|------|
-| NSX 4.x | 完整 | 最新 Policy API，全部功能 |
-| NSX-T 3.2 | 完整 | 所有功能可用 |
-| NSX-T 3.1 | 完整 | 路由表格式略有差异 |
-| NSX-T 3.0 | 兼容 | IP 池子网 API 在此版本引入 |
-| NSX-T 2.5 | 有限 | Policy API 不完整，部分工具可能失败 |
-| NSX-V (6.x) | 不支持 | 完全不同的 API（基于 SOAP） |
-
-#### VCF 兼容性
-
-| VCF 版本 | 捆绑 NSX | 支持 |
-|----------|----------|------|
-| VCF 5.x | NSX 4.x | 完整 |
-| VCF 4.3-4.5 | NSX-T 3.1-3.2 | 完整 |
+属于 [VMware Skills 家族](https://github.com/vmware-skills/marketplace/blob/main/README-CN.md)：15 个 skill、14 个 MCP server 与一个共享 Policy 库。如果对你有用，欢迎 Star 家族门户。
 
 <a id="readme-license"></a>
 
-## 许可证
-
-[MIT](LICENSE)
+[问题与反馈](https://github.com/vmware-skills/VMware-NSX/issues) · [MIT](https://opensource.org/license/mit/)
