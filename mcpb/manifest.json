@@ -1,0 +1,73 @@
+{
+  "manifest_version": "0.4",
+  "name": "vmware-nsx",
+  "display_name": "VMware NSX",
+  "version": "1.15.3",
+  "description": "VMware NSX networking management: segments, gateways, NAT, routing, IPAM",
+  "long_description": "Runs the published vmware-nsx-mgmt 1.15.3 MCP server locally. This extension starts with read-only tools (expose = read); set it to all to offer write tools, which stay governed by the shared policy and are recorded in the local audit log. Configure targets and credentials with the setup guide first, then point this extension at that config.",
+  "author": {
+    "name": "Wei Zhou",
+    "url": "https://github.com/zw008"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vmware-skills/VMware-NSX"
+  },
+  "homepage": "https://github.com/vmware-skills/VMware-NSX",
+  "documentation": "https://github.com/vmware-skills/VMware-NSX/blob/main/skills/vmware-nsx/references/setup-guide.md",
+  "support": "https://github.com/vmware-skills/VMware-NSX/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "server/main.py"
+      ],
+      "env": {
+        "VMWARE_NSX_CONFIG": "${user_config.config_path}",
+        "VMWARE_NSX_MCP_EXPOSE": "${user_config.expose}"
+      }
+    }
+  },
+  "user_config": {
+    "config_path": {
+      "type": "file",
+      "title": "vmware-nsx config file",
+      "description": "config.yaml from the setup guide. Passwords stay in the .env file next to it.",
+      "required": true,
+      "default": "${HOME}/.vmware-nsx/config.yaml"
+    },
+    "expose": {
+      "type": "string",
+      "title": "Tools to offer",
+      "description": "read = read-only tools only (default); all = every tool, including writes.",
+      "required": true,
+      "default": "read"
+    }
+  },
+  "tools_generated": true,
+  "keywords": [
+    "vmware",
+    "vsphere",
+    "nsx",
+    "networking",
+    "segments",
+    "gateways"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "python": ">=3.10"
+    }
+  }
+}
