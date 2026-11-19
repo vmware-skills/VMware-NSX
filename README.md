@@ -29,13 +29,13 @@ Synthetic-data GIF; video includes redacted historical screenshots. [Download th
 Install the published CLI and inspect its commands:
 
 ```sh
-uv tool install vmware-nsx-mgmt==1.15.3
+uv tool install vmware-nsx-mgmt==1.15.4
 vmware-nsx --help
 ```
 
 Requires uv and Python >=3.10. Configure targets and credentials locally before remote queries. [Setup guide](https://github.com/vmware-skills/VMware-NSX/blob/main/skills/vmware-nsx/references/setup-guide.md).
 
-One-click installs, after local setup: [Claude Desktop extension (.mcpb)](https://github.com/vmware-skills/VMware-NSX/releases/download/v1.15.3/vmware-nsx-1.15.3.mcpb) · [Install in VS Code](https://insiders.vscode.dev/redirect/mcp/install?name=vmware-nsx&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22vmware-nsx-mgmt%3D%3D1.15.3%22%2C%22vmware-nsx-mcp%22%5D%7D). Both run the same pinned 1.15.3 server. The desktop extension starts with read-only tools; change *Tools to offer* to `all` for writes.
+One-click installs, after local setup: [Claude Desktop extension (.mcpb)](https://github.com/vmware-skills/VMware-NSX/releases/download/v1.15.4/vmware-nsx-1.15.4.mcpb) · [Install in VS Code](https://insiders.vscode.dev/redirect/mcp/install?name=vmware-nsx&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22vmware-nsx-mgmt%3D%3D1.15.4%22%2C%22vmware-nsx-mcp%22%5D%7D). Both run the same pinned 1.15.4 server. The desktop extension starts with read-only tools; change *Tools to offer* to `all` for writes.
 
 For agent-host installation, use the [setup guide](https://github.com/vmware-skills/VMware-NSX/blob/main/skills/vmware-nsx/references/setup-guide.md) and [Cursor, Codex, Gemini CLI, Cline and local-model examples](https://github.com/vmware-skills/marketplace/blob/main/docs/agent-hosts.md).
 
@@ -65,3 +65,7 @@ Part of [VMware Skills](https://github.com/vmware-skills/marketplace): 15 skills
 <a id="readme-license"></a>
 
 [Issues and feedback](https://github.com/vmware-skills/VMware-NSX/issues) · [MIT](https://opensource.org/license/mit/)
+
+## MCP result contract
+
+Offset-capable listings expose `next_offset`; stop when it is null rather than looping on `truncated`. Failed calls provide `structuredContent.vmware_error` through Policy 1.26.0. Existing text, legacy flags, success values and confirmation checks remain unchanged. See the [contract](https://github.com/vmware-skills/VMware-NSX/blob/main/skills/vmware-nsx/references/mcp-result-contract.md).

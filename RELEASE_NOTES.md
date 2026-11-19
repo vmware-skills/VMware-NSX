@@ -1,3 +1,9 @@
+## v1.15.4 (2026-11-19) — Compatible MCP result contracts
+
+Use shared offset continuation calculations and offset-aware envelopes where applicable. Requires vmware-policy>=1.26.0. Tool names, arguments, defaults and confirmation checks are unchanged.
+
+中文：复用公共续页计算，并在适用处使用带 offset 的分页 envelope。 依赖 vmware-policy>=1.26.0。工具名、参数、默认值和确认机制不变。
+
 ## v1.15.3 — Security documentation and Gemini extension packaging
 
 Released 2026-11-09.
