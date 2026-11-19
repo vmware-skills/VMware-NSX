@@ -98,12 +98,9 @@ def next_offset(returned: int, limit: int, offset: int, total: int | None) -> in
     Returns:
         The next offset, or ``None`` if this page ends the collection.
     """
-    if returned <= 0:
-        return None
-    consumed = offset + returned
-    if total is not None:
-        return consumed if consumed < total else None
-    return consumed if returned >= limit else None
+    from vmware_policy.envelope import next_offset as shared_next_offset
+
+    return shared_next_offset(returned, limit, offset, total)
 
 
 def page_hint(
@@ -127,36 +124,9 @@ def page_hint(
     over, and it already did. So the semantics stay and the sentence is
     rewritten from the offset the ops layer has and the shared package does not.
     """
-    if nxt is not None:
-        if total is not None:
-            return (
-                f"Showing rows {offset}-{offset + returned - 1} of {total}. "
-                f"Continue at offset {nxt} for the next page, or narrow the query "
-                f"with a filter."
-            )
-        return (
-            f"Showing {returned} rows from offset {offset}, which fills the limit "
-            f"({limit}) — there may be more. Continue at offset {nxt}; the walk "
-            f"ends when next_offset is null."
-        )
-    if returned == 0:
-        if total is not None and offset >= total:
-            return (
-                f"No rows at offset {offset}: the collection holds {total}, so this "
-                f"offset is past the end. There is no next page — start again at "
-                f"offset 0."
-            )
-        # Zero rows that are not past a known end: the manager returned nothing
-        # for a window inside the collection it reported. Say what happened
-        # rather than inventing a cause.
-        return "No rows on this page, and no next page. Re-read from offset 0 to see the collection."
-    size = f"{total}" if total is not None else "the collection"
-    return (
-        f"Showing rows {offset}-{offset + returned - 1}, the last {returned} of {size}. "
-        f"There is no next page. 'truncated' is true because these {returned} rows are "
-        f"not the whole collection, not because more can be fetched — read from "
-        f"offset 0 for all of it."
-    )
+    from vmware_policy.envelope import page_hint as shared_page_hint
+
+    return shared_page_hint(returned, limit, offset, total, nxt)
 
 
 def page_envelope(
@@ -177,10 +147,6 @@ def page_envelope(
     unchanged; ``next_offset`` is still the stop signal and ``truncated`` still
     answers whether ``items`` is the whole collection.
     """
-    from vmware_policy import paginated
+    from vmware_policy import page_envelope as shared_page_envelope
 
-    nxt = next_offset(len(items), limit, offset, total)
-    envelope = paginated(items, limit=limit, total=total, next_offset=nxt, **extra)
-    if envelope["truncated"]:
-        envelope["hint"] = page_hint(len(items), limit, offset, total, nxt)
-    return envelope
+    return shared_page_envelope(items, limit=limit, offset=offset, total=total, **extra)

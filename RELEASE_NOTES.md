@@ -1,3 +1,9 @@
+## Unreleased — shared MCP result contract
+
+Use shared offset continuation calculations and offset-aware envelopes where applicable. Requires Policy 1.26.0; release it first and refresh this repository’s lock before merging or publishing. Tool names, arguments, defaults and confirmation checks are unchanged.
+
+中文：复用公共续页计算，并在适用处使用带 offset 的分页 envelope。 依赖 Policy 1.26.0，须先发布共享库再刷新本仓锁文件后合并/发布。工具名、参数、默认值和确认机制不变。
+
 ## v1.15.3 — Security documentation and Gemini extension packaging
 
 Released 2026-11-09.
